@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WaterLeak comparison layout regression</title>
+    <style>
+      #application {
+        width: 1400px;
+        height: 1000px;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body data-result="RUNNING">
+    <iframe id="application" src="/"></iframe>
+    <pre id="details"></pre>
+    <script>
+      function assert(condition, message) {
+        if (!condition) throw new Error(message);
+      }
+
+      async function waitFor(predicate, message, attempts = 60) {
+        for (let attempt = 0; attempt < attempts; attempt += 1) {
+          if (predicate()) return;
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+        }
+        throw new Error(message);
+      }
+
+      async function runChecks() {
+        try {
+          const appDocument =
+            document.querySelector("#application").contentDocument;
+          const appWindow = appDocument.defaultView;
+          appWindow.fetch = async () =>
+            new appWindow.Response(
+              JSON.stringify([
+                {
+                  class: "water damage",
+                  confidence: 0.84,
+                  bbox: [50, 300, 250, 900],
+                },
+              ]),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+
+          const svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="1200">' +
+            '<rect width="600" height="1200" fill="#b8c0bd"/>' +
+            "</svg>";
+          const mediaInput = appDocument.querySelector("#media-files");
+          const singleTransfer = new appWindow.DataTransfer();
+          singleTransfer.items.add(
+            new appWindow.File([svg], "single.svg", {
+              type: "image/svg+xml",
+            }),
+          );
+          mediaInput.files = singleTransfer.files;
+          mediaInput.dispatchEvent(
+            new appWindow.Event("change", { bubbles: true }),
+          );
+          await waitFor(
+            () =>
+              appDocument.querySelectorAll(".image-card").length === 1,
+            "The single-image fixture did not load.",
+          );
+          const singleGrid = appDocument.querySelector("#image-grid");
+          const singleCardWidth =
+            appDocument
+              .querySelector(".image-card")
+              .getBoundingClientRect().width;
+          assert(
+            singleGrid.classList.contains("single-image-mode") &&
+              singleCardWidth <= 761,
+            `A single image should use the smaller centered preview; ` +
+              `its width was ${singleCardWidth.toFixed(1)}px.`,
+          );
+
+          const transfer = new appWindow.DataTransfer();
+          for (const name of ["first.svg", "second.svg"]) {
+            transfer.items.add(
+              new appWindow.File([svg], name, {
+                type: "image/svg+xml",
+              }),
+            );
+          }
+          mediaInput.files = transfer.files;
+          mediaInput.dispatchEvent(
+            new appWindow.Event("change", { bubbles: true }),
+          );
+          await waitFor(
+            () =>
+              appDocument.querySelectorAll(".image-card").length === 2,
+            "The image fixtures did not load.",
+          );
+          appDocument.querySelector("#detect-button").click();
+          await waitFor(
+            () => appDocument.querySelector("#download-dataset"),
+            "Individual-model detection did not complete.",
+          );
+
+          const imageGrid = appDocument.querySelector("#image-grid");
+          const firstCard = appDocument.querySelector(".image-card");
+          const widthBeforeCompare =
+            firstCard.getBoundingClientRect().width;
+          const compareImages =
+            appDocument.querySelector("#compare-images");
+          compareImages.click();
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const widthAfterCompare =
+            firstCard.getBoundingClientRect().width;
+
+          assert(compareImages.checked, "Compare was not enabled.");
+          assert(
+            !imageGrid.classList.contains("comparison-mode") &&
+              widthAfterCompare <= widthBeforeCompare * 1.25,
+            `Compare without comparison results expanded each card from ` +
+              `${widthBeforeCompare.toFixed(1)}px to ` +
+              `${widthAfterCompare.toFixed(1)}px.`,
+          );
+
+          appDocument.querySelector("#detect-button").click();
+          await waitFor(
+            () =>
+              imageGrid.classList.contains("comparison-mode") &&
+              appDocument.querySelectorAll(".comparison-grid").length === 2,
+            "Completed comparison results did not enable comparison layout.",
+          );
+
+          document.body.dataset.result = "PASS";
+          document.querySelector("#details").textContent =
+            "Comparison layout stayed compact.";
+        } catch (error) {
+          document.body.dataset.result = "FAIL";
+          document.querySelector("#details").textContent =
+            error.stack || error.message;
+        }
+      }
+
+      window.addEventListener("load", () => {
+        window.setTimeout(() => void runChecks(), 500);
+      });
+    </script>
+  </body>
+</html>

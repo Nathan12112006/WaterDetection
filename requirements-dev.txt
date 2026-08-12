@@ -1,0 +1,5 @@
+-r requirements.txt
+
+httpx2==2.7.0
+onnx==1.22.0
+polars==1.42.1

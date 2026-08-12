@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WaterLeak React browser behavior tests</title>
+    <style>
+      #application {
+        width: 1400px;
+        height: 1000px;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body data-result="RUNNING">
+    <iframe id="application" src="/"></iframe>
+    <pre id="details"></pre>
+    <script>
+      function assert(condition, message) {
+        if (!condition) throw new Error(message);
+      }
+
+      async function waitFor(predicate, message, attempts = 60) {
+        for (let attempt = 0; attempt < attempts; attempt += 1) {
+          if (predicate()) return;
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+        }
+        throw new Error(message);
+      }
+
+      async function runChecks() {
+        try {
+          const appDocument =
+            document.querySelector("#application").contentDocument;
+          assert(
+            appDocument.querySelector("h1").textContent ===
+              "Water Leaking Detector",
+            "The React application renders.",
+          );
+          assert(
+            appDocument.querySelector("#preview-workspace") &&
+              appDocument.querySelector("#review-workspace") &&
+              appDocument.querySelector("#review-overview-grid") &&
+              appDocument.querySelector("#select-all-review-images") &&
+              appDocument.querySelector("#clear-review-selection") &&
+              appDocument.querySelector("#bulk-approve") &&
+              !appDocument.querySelector("#review-editor-workspace") &&
+              !appDocument.querySelector("#bulk-confidence") &&
+              !appDocument.querySelector("#bulk-confirm") &&
+              !appDocument.querySelector("#bulk-remove"),
+            "The overview renders without a duplicate hidden review editor.",
+          );
+
+          const reviewTab = appDocument.querySelector("#review-tab");
+          const tooltip = appDocument.querySelector(
+            "#disabled-action-tooltip",
+          );
+          reviewTab.dispatchEvent(
+            new appDocument.defaultView.PointerEvent("pointermove", {
+              bubbles: true,
+              clientX: 10,
+              clientY: 10,
+            }),
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          assert(
+            !tooltip.hidden &&
+              tooltip.textContent ===
+                "Run image detection before reviewing annotations.",
+            "The disabled review tab explains why it cannot be clicked.",
+          );
+
+          appDocument.dispatchEvent(
+            new appDocument.defaultView.PointerEvent("pointermove", {
+              bubbles: true,
+              clientX: 1,
+              clientY: 1,
+            }),
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          assert(
+            tooltip.hidden,
+            "Disabled-action explanation disappears.",
+          );
+
+          const appWindow = appDocument.defaultView;
+          appWindow.fetch = async () =>
+            new appWindow.Response(
+              JSON.stringify([
+                {
+                  class: "water damage",
+                  confidence: 0.84,
+                  bbox: [50, 300, 250, 900],
+                },
+                {
+                  class: "water damage",
+                  confidence: 0.36,
+                  bbox: [320, 100, 550, 400],
+                },
+              ]),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          const svg =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="1200">' +
+            '<rect width="600" height="1200" fill="#b8c0bd"/>' +
+            '<rect x="50" y="80" width="500" height="1040" fill="#d9d4c9"/>' +
+            "</svg>";
+          const transfer = new appWindow.DataTransfer();
+          transfer.items.add(
+            new appWindow.File([svg], "mouse-edit.svg", {
+              type: "image/svg+xml",
+            }),
+          );
+          transfer.items.add(
+            new appWindow.File([svg], "mouse-edit-next.svg", {
+              type: "image/svg+xml",
+            }),
+          );
+          const mediaInput = appDocument.querySelector("#media-files");
+          mediaInput.files = transfer.files;
+          mediaInput.dispatchEvent(
+            new appWindow.Event("change", { bubbles: true }),
+          );
+          await waitFor(
+            () => appDocument.querySelector("#status").textContent.includes(
+              "ready to detect",
+            ),
+            "The mouse-edit fixture did not load.",
+          );
+          appDocument.querySelector("#detect-button").click();
+          await waitFor(
+            () => !reviewTab.disabled,
+            "Detection did not enable annotation review.",
+          );
+          assert(
+            !appDocument.querySelector("#results"),
+            "Image detection should not render a detection summary.",
+          );
+          assert(
+            appDocument.querySelector("#download-dataset"),
+            "Dataset export should remain available with the image previews.",
+          );
+          reviewTab.click();
+          await waitFor(
+            () => appDocument.querySelector(".review-card-open"),
+            "The review overview did not render its edit action.",
+          );
+          assert(
+            !appDocument.querySelector(".priority-badge"),
+            "Review images should not display uncertainty percentages.",
+          );
+          appDocument.querySelector(".review-card-open").click();
+          await waitFor(
+            () => appDocument.querySelector("#review-canvas"),
+            "The annotation editor did not open.",
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+
+          const canvas = appDocument.querySelector("#review-canvas");
+          canvas.setPointerCapture = () => {};
+          const bounds = canvas.getBoundingClientRect();
+          const contentScale = Math.min(
+            bounds.width / canvas.width,
+            bounds.height / canvas.height,
+          );
+          const contentWidth = canvas.width * contentScale;
+          const contentHeight = canvas.height * contentScale;
+          const contentLeft = bounds.left + (bounds.width - contentWidth) / 2;
+          const contentTop = bounds.top + (bounds.height - contentHeight) / 2;
+          const startX = contentLeft + contentWidth * (150 / 600);
+          const startY = contentTop + contentHeight * (600 / 1200);
+          const pointer = (type, x, y, buttons) =>
+            canvas.dispatchEvent(
+              new appWindow.PointerEvent(type, {
+                bubbles: true,
+                button: 0,
+                buttons,
+                clientX: x,
+                clientY: y,
+                pointerId: 7,
+                pointerType: "mouse",
+              }),
+            );
+          pointer("pointerdown", startX, startY, 1);
+          pointer("pointerup", startX, startY, 0);
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          assert(
+            appDocument.querySelector("#annotation-x1"),
+            `Clicking the visible box did not select it ` +
+              `(canvas ${canvas.width}x${canvas.height}, bounds ` +
+              `${bounds.width.toFixed(1)}x${bounds.height.toFixed(1)}, ` +
+              `content ${contentWidth.toFixed(1)}x${contentHeight.toFixed(1)}).`,
+          );
+          assert(
+            appDocument.querySelector(
+              "#review-selection-title",
+            ).textContent === "water leaking",
+            "The review UI should display the water leaking class label.",
+          );
+
+          const drawingContext = canvas.getContext("2d");
+          const visibleBoxPixel = Array.from(
+            drawingContext.getImageData(150, 300, 1, 1).data,
+          );
+          appDocument.querySelector("#remove-annotation").click();
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const removedBoxPixel = Array.from(
+            drawingContext.getImageData(150, 300, 1, 1).data,
+          );
+          assert(
+            visibleBoxPixel.some(
+              (channel, index) =>
+                Math.abs(channel - removedBoxPixel[index]) > 20,
+            ),
+            "Removing an annotation should erase its outline from the canvas.",
+          );
+          assert(
+            appDocument.querySelector(".annotation-chip.removed"),
+            "Removed annotations should remain available in the inspector.",
+          );
+          assert(
+            !appDocument.querySelector("#restore-annotation").disabled,
+            "Removed annotations should remain restorable.",
+          );
+          appDocument.querySelector("#restore-annotation").click();
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+
+          const wheelEvent = new appWindow.WheelEvent("wheel", {
+            bubbles: true,
+            cancelable: true,
+            clientX: startX,
+            clientY: startY,
+            deltaY: -120,
+          });
+          canvas.dispatchEvent(wheelEvent);
+          assert(
+            wheelEvent.defaultPrevented,
+            "Wheel input over the editor must be consumed instead of scrolling the page.",
+          );
+
+          const rightEdgeX = contentLeft + contentWidth * (250 / 600);
+          const rightEdgeY = contentTop + contentHeight * (600 / 1200);
+          const resizedEdgeX = rightEdgeX + 40;
+          pointer("pointerdown", rightEdgeX, rightEdgeY, 1);
+          pointer("pointermove", resizedEdgeX, rightEdgeY, 1);
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          pointer("pointerup", resizedEdgeX, rightEdgeY, 0);
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+
+          const resizedLeft = Number(
+            appDocument.querySelector("#annotation-x1").value,
+          );
+          const resizedRight = Number(
+            appDocument.querySelector("#annotation-x2").value,
+          );
+          assert(
+            resizedRight - resizedLeft > 200,
+            `Dragging a box edge should resize it; width remained ${resizedRight - resizedLeft}.`,
+          );
+
+          const movedY = startY + 35;
+          pointer("pointerdown", startX, startY, 1);
+          pointer("pointermove", startX, movedY, 1);
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          pointer("pointerup", startX, movedY, 0);
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+          const movedTop = Number(
+            appDocument.querySelector("#annotation-y1").value,
+          );
+          assert(
+            movedTop > 300,
+            `Dragging inside a box should move it; y1 remained ${movedTop}.`,
+          );
+
+          const blankX = contentLeft + contentWidth * (570 / 600);
+          const blankY = contentTop + contentHeight * (1080 / 1200);
+          const imageBeforePan = canvas.toDataURL();
+          pointer("pointerdown", blankX, blankY, 1);
+          pointer("pointermove", blankX - 30, blankY - 30, 1);
+          assert(
+            canvas.style.cursor === "grabbing",
+            "Left-dragging empty canvas space should enter pan mode.",
+          );
+          pointer("pointerup", blankX - 30, blankY - 30, 0);
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+          assert(
+            canvas.toDataURL() !== imageBeforePan,
+            "Left-dragging empty canvas space should move the zoomed image.",
+          );
+
+          appDocument.querySelector("#draw-annotation").click();
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const drawingStartX = contentLeft + contentWidth * 0.5;
+          const drawingStartY = contentTop + contentHeight * 0.85;
+          pointer("pointerdown", drawingStartX, drawingStartY, 1);
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const backgroundBeforeEdge = Array.from(
+            drawingContext.getImageData(0, 450, 600, 50).data,
+          );
+          pointer(
+            "pointermove",
+            contentLeft + contentWidth - 10,
+            drawingStartY,
+            1,
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const backgroundInsideEdge = Array.from(
+            drawingContext.getImageData(0, 450, 600, 50).data,
+          );
+          assert(
+            backgroundInsideEdge.every(
+              (channel, index) => channel === backgroundBeforeEdge[index],
+            ),
+            "Drawing within the visible image should not move the viewport.",
+          );
+          pointer(
+            "pointermove",
+            contentLeft + contentWidth + 40,
+            drawingStartY,
+            1,
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
+          const backgroundPastEdge = Array.from(
+            drawingContext.getImageData(0, 450, 600, 50).data,
+          );
+          assert(
+            backgroundPastEdge.some(
+              (channel, index) =>
+                Math.abs(channel - backgroundInsideEdge[index]) > 20,
+            ),
+            "Extending a new box offscreen should pan the image with the pointer.",
+          );
+          pointer(
+            "pointerup",
+            contentLeft + contentWidth + 40,
+            drawingStartY,
+            0,
+          );
+          await new Promise((resolve) => window.setTimeout(resolve, 100));
+
+          appDocument.querySelector("#approve-image").click();
+          await waitFor(
+            () =>
+              appDocument.querySelector(
+                "#review-editor-workspace h2",
+              )?.textContent === "mouse-edit-next.svg",
+            "Approving an edited image should advance to the next image.",
+          );
+          appDocument.querySelector("#approve-image").click();
+          await waitFor(
+            () => !appDocument.querySelector("#review-editor-workspace"),
+            "Approving the final image should return to the annotation overview.",
+          );
+
+          document.body.dataset.result = "PASS";
+          document.querySelector("#details").textContent =
+            "All React browser checks passed.";
+        } catch (error) {
+          document.body.dataset.result = "FAIL";
+          document.querySelector("#details").textContent =
+            error.stack || error.message;
+        }
+      }
+
+      window.addEventListener("load", () => {
+        window.setTimeout(() => void runChecks(), 500);
+      });
+    </script>
+  </body>
+</html>
