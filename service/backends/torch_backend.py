@@ -60,6 +60,7 @@ class TorchBackend:
                     source=image,
                     conf=confidence,
                     iou=0.4,
+                    agnostic_nms=True,
                     device=self.device,
                     rect=False,
                     verbose=False,

@@ -36,13 +36,11 @@ frontend/dist/
 frontend/node_modules/
 
 # Test and development-only material
-scripts/
 tools/
-benchmark.py
 benchmark.md
 ensemble_predict.py
 upload_models.py
-image*.jpg
+*.jpg
 *.mp4
 *.log
 *.zip

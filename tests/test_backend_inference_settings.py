@@ -66,6 +66,7 @@ class BackendInferenceSettingsTests(unittest.TestCase):
 
         model.predict.assert_called_once()
         self.assertEqual(model.predict.call_args.kwargs["iou"], 0.4)
+        self.assertTrue(model.predict.call_args.kwargs["agnostic_nms"])
 
     def test_onnx_backend_owns_same_iou_threshold(self) -> None:
         from service.backends.onnx_backend import OnnxBackend
