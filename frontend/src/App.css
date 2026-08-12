@@ -694,7 +694,8 @@ h1 {
 .image-card canvas {
   display: block;
   width: 100%;
-  height: auto;
+  height: clamp(220px, 28vw, 420px);
+  object-fit: contain;
   background: #030911;
 }
 
