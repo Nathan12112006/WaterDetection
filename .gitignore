@@ -29,9 +29,7 @@ downloads/
 Past dataset/
 test/
 real_water_photos_manifest.csv
-docs/dataset-*.md
-docs/*-run-report.md
-docs/research/
+docs/
 
 # Generated frontend output (Docker rebuilds this from frontend/src)
 frontend/dist/
@@ -62,3 +60,4 @@ model-manifest.json
 *.pt
 !best.pt
 !waterAccubest.pt
+NOTES.md
