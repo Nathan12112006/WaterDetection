@@ -15,7 +15,7 @@ __pycache__/
 htmlcov/
 
 # Codex/workflow and scratch material
-.agents/
+.agents
 .codex/
 .codex_workflow_hidden_resource
 .scratch/
