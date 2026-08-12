@@ -17,7 +17,7 @@ htmlcov/
 # Codex/workflow and scratch material
 .agents/
 .codex/
-.codex_workflow_hidden_resource/
+.codex_workflow_hidden_resource
 .scratch/
 agent_docs/
 
