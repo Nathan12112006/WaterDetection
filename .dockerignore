@@ -1,19 +1,23 @@
+# Repository metadata and local assistant state
 .git/
 .github/
 .gitignore
 .agents/
 .codex/
+.codex_workflow_hidden_resource/
 .scratch/
+agent_docs/
 AGENTS.md
 CONTEXT.md
 
+# Secrets and local environments
 .env
 .env.*
 !.env.example
 .venv/
 venv/
-frontend/node_modules/
-frontend/dist/
+
+# Python and frontend caches/build output
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -24,36 +28,38 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+frontend/node_modules/
+frontend/dist/
 
+# Training, research, tests, and development material
 dataset/
-Past dataset/
-downloads/
 runs/
+reference/
+downloads/
 test/
 tests/
+docs/
+scripts/
+tools/
+real_water_photos_manifest.csv
+benchmark.py
+benchmark.md
+ensemble_predict.py
+upload_models.py
+requirements-dev.txt
 
+# Local test media and archives
+image*.jpg
+*.mp4
 *.log
 *.zip
 *.tar
 *.tar.gz
 
+# Only the two runtime checkpoints are sent to the final image
 *.pt
-*.onnx
 !best.pt
-!best.onnx
-!last.pt
-!last.onnx
-
-benchmark.py
-cli.py
-main.py
-upload_models.py
-requirements-dev.txt
-.python-version
-docs/
-scripts/
-README.md
-deploy.md
-MISSION.md
-NOTES.md
-RESOURCES.md
+!waterAccubest.pt
+*.onnx
+last.pt
+model-manifest.json
