@@ -1,21 +1,64 @@
+# Secrets and local configuration
 .env
+.env.*
+!.env.example
+
+# Local Python environments and caches
 .venv/
+venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
+# Codex/workflow and scratch material
 .agents/
-.scratch/
 .codex/
+.codex_workflow_hidden_resource/
+.scratch/
+agent_docs/
 
+# Training datasets, generated runs, and downloaded/research material
 dataset/
 runs/
+reference/
+downloads/
+Past dataset/
 test/
+real_water_photos_manifest.csv
+docs/dataset-*.md
+docs/*-run-report.md
+docs/research/
 
+# Generated frontend output (Docker rebuilds this from frontend/src)
+frontend/dist/
+frontend/node_modules/
+
+# Test and development-only material
+scripts/
+tools/
+benchmark.py
+benchmark.md
+ensemble_predict.py
+upload_models.py
+image*.jpg
+*.mp4
 *.log
 *.zip
+*.tar
+*.tar.gz
 
-*.pt
+# Obsolete or generated model formats
 *.onnx
+last.pt
+best.onnx
+waterAccubest.onnx
+model-manifest.json
+
+# Ignore arbitrary weights, but ship only the two runtime checkpoints
+*.pt
 !best.pt
 !waterAccubest.pt
