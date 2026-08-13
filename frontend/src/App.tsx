@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import './App.css'
 import { AppHeader } from './components/AppHeader'
 import { ControlsPanel } from './components/ControlsPanel'
@@ -12,10 +12,18 @@ import {
   type VideoWorkspaceHandle,
 } from './components/VideoWorkspace'
 import { WorkspaceTabs } from './components/WorkspaceTabs'
+import { WorkflowStageBar } from './components/WorkflowStageBar'
+import { WorkspaceShell } from './components/WorkspaceShell'
 import { requestDetections } from './lib/api'
 import { buildDatasetArchive } from './lib/archive'
 import { downloadBlob } from './lib/downloads'
 import { createImageEntry, errorText } from './lib/media'
+import {
+  createBeforeUnloadHandler,
+  createInitialWorkspaceSession,
+  workspaceSessionActions,
+  workspaceSessionReducer,
+} from './lib/workspaceSession'
 import {
   activeDetections,
   emptyHistory,
@@ -28,6 +36,7 @@ import type {
   StatusMessage,
   UploadSource,
   WorkspaceTab,
+  WorkflowStage,
 } from './types'
 
 interface VideoSelection {
@@ -77,6 +86,11 @@ function resetForDetection(entry: ImageEntry): ImageEntry {
 }
 
 function App() {
+  const [workspace, dispatchWorkspace] = useReducer(
+    workspaceSessionReducer,
+    undefined,
+    createInitialWorkspaceSession,
+  )
   const [settings, setSettings] = useState(INITIAL_SETTINGS)
   const [status, setStatus] = useState(INITIAL_STATUS)
   const [mediaMode, setMediaMode] = useState<MediaMode | null>(null)
@@ -106,6 +120,7 @@ function App() {
     setActiveTab('preview')
     setResultsVisible(false)
     setVideoSummary([])
+    dispatchWorkspace(workspaceSessionActions.mediaCleared())
   }
 
   useEffect(
@@ -114,6 +129,12 @@ function App() {
     },
     [],
   )
+
+  useEffect(() => {
+    const beforeUnload = createBeforeUnloadHandler(() => workspace)
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [workspace])
 
   const updateSettings = (next: DetectionSettings) => {
     if (next.uploadSource !== settings.uploadSource) {
@@ -141,6 +162,9 @@ function App() {
       }
       setImageEntries(entries)
       setMediaMode('images')
+      dispatchWorkspace(
+        workspaceSessionActions.mediaLoaded('images', entries.length),
+      )
       setResultsVisible(false)
       reportStatus(
         skipped > 0
@@ -190,6 +214,7 @@ function App() {
         objectUrls.current.add(url)
         setVideo({ file: videoFiles[0], url })
         setMediaMode('video')
+        dispatchWorkspace(workspaceSessionActions.mediaLoaded('video', 1))
         reportStatus('Loading video metadata…')
         return
       }
@@ -207,6 +232,8 @@ function App() {
     let working = imageEntries.map(resetForDetection)
     setImageEntries(working)
     setActiveTab('preview')
+    dispatchWorkspace(workspaceSessionActions.setStage('run'))
+    dispatchWorkspace(workspaceSessionActions.invalidateExportSafety())
     setResultsVisible(true)
     let failedImages = 0
     let totalDetections = 0
@@ -262,6 +289,8 @@ function App() {
       return
     }
     setProcessing(true)
+    dispatchWorkspace(workspaceSessionActions.setStage('run'))
+    dispatchWorkspace(workspaceSessionActions.invalidateExportSafety())
     reportStatus('Starting detection. The first request may load the model.')
     try {
       if (mediaMode === 'images') {
@@ -307,6 +336,7 @@ function App() {
     try {
       const archive = await buildDatasetArchive(exportableEntries)
       downloadBlob(archive, 'water-leak-yolo-dataset.zip')
+      dispatchWorkspace(workspaceSessionActions.markExportSafe())
       reportStatus(
         `Dataset ZIP created with ${exportableEntries.length} images.`,
       )
@@ -317,6 +347,32 @@ function App() {
     }
   }
 
+  const updateImageEntries = (entries: ImageEntry[]) => {
+    setImageEntries(entries)
+    dispatchWorkspace(workspaceSessionActions.invalidateExportSafety())
+  }
+
+  const handleTabChange = (tab: WorkspaceTab) => {
+    if (tab === 'review' && reviewEnabled) {
+      setActiveTab('review')
+      dispatchWorkspace(workspaceSessionActions.enterReview())
+      return
+    }
+    setActiveTab('preview')
+    if (activeTab === 'review') {
+      dispatchWorkspace(workspaceSessionActions.leaveReview())
+    }
+  }
+
+  const handleStageSelect = (stage: WorkflowStage) => {
+    if (stage === 'review' && !reviewEnabled) return
+    if (stage === 'review' && reviewEnabled) {
+      handleTabChange('review')
+      return
+    }
+    dispatchWorkspace(workspaceSessionActions.setStage(stage))
+  }
+
   return (
     <main className="app-shell">
       <AppHeader
@@ -325,10 +381,26 @@ function App() {
         processing={processing}
       />
 
-      <div
-        className={`layout${visibleTab === 'review' ? ' review-mode' : ''}`}
-      >
-        {visibleTab !== 'review' && (
+      <WorkflowStageBar
+        activeStage={workspace.workflowStage}
+        reviewAvailable={reviewEnabled}
+        onStageSelect={handleStageSelect}
+      />
+
+      <WorkspaceShell
+        leftOpen={workspace.leftPanelOpen}
+        rightOpen={workspace.rightPanelOpen}
+        rightWidth={workspace.rightPanelWidth}
+        onToggleLeft={() =>
+          dispatchWorkspace(workspaceSessionActions.togglePanel('left'))
+        }
+        onToggleRight={() =>
+          dispatchWorkspace(workspaceSessionActions.togglePanel('right'))
+        }
+        onResizeRight={(width) =>
+          dispatchWorkspace(workspaceSessionActions.resizeRightPanel(width))
+        }
+        left={
           <ControlsPanel
             settings={settings}
             mediaMode={mediaMode}
@@ -341,72 +413,90 @@ function App() {
             }
             onSubmit={() => void runDetection()}
           />
-        )}
-
-        <section className="panel stage" aria-label="Detection preview">
-          <WorkspaceTabs
-            activeTab={visibleTab}
-            mediaMode={mediaMode}
-            reviewEnabled={reviewEnabled}
-            onTabChange={setActiveTab}
-          />
-          <div className="stage-content">
-            <div id="preview-workspace" hidden={visibleTab !== 'preview'}>
-              {mediaMode === null && (
-                <EmptyState
-                  id="empty-state"
-                  title="No media selected"
-                  icon={
-                    <div className="empty-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12 3.5s-5 5.4-5 9.3a5 5 0 0 0 10 0c0-3.9-5-9.3-5-9.3Z" />
-                        <path d="M9.7 14.2a2.6 2.6 0 0 0 2.1 1.3" />
-                      </svg>
-                    </div>
-                  }
-                >
-                  Add photos or a video to preview them here.
-                </EmptyState>
-              )}
-              {mediaMode === 'images' && (
-                <ImageGallery
+        }
+        center={
+          <section className="panel stage" aria-label="Detection preview">
+            <WorkspaceTabs
+              activeTab={visibleTab}
+              mediaMode={mediaMode}
+              reviewEnabled={reviewEnabled}
+              onTabChange={handleTabChange}
+            />
+            <div className="stage-content">
+              <div id="preview-workspace" hidden={visibleTab !== 'preview'}>
+                {mediaMode === null && (
+                  <EmptyState
+                    id="empty-state"
+                    title="No media selected"
+                    icon={
+                      <div className="empty-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 3.5s-5 5.4-5 9.3a5 5 0 0 0 10 0c0-3.9-5-9.3-5-9.3Z" />
+                          <path d="M9.7 14.2a2.6 2.6 0 0 0 2.1 1.3" />
+                        </svg>
+                      </div>
+                    }
+                  >
+                    Add photos or a video to preview them here.
+                  </EmptyState>
+                )}
+                {mediaMode === 'images' && (
+                  <ImageGallery
+                    entries={imageEntries}
+                    canExportDataset={exportableEntries.length > 0}
+                    exporting={exporting}
+                    onExportDataset={() => void exportDataset()}
+                    onStatus={reportStatus}
+                  />
+                )}
+                {mediaMode === 'video' && video && (
+                  <VideoWorkspace
+                    ref={videoWorkspaceRef}
+                    file={video.file}
+                    url={video.url}
+                    onRatesChange={(rates) => {
+                      setVideoRates(rates)
+                      setSettings((current) => ({
+                        ...current,
+                        videoSampleRate: rates.includes(
+                          current.videoSampleRate,
+                        )
+                          ? current.videoSampleRate
+                          : (rates.at(-1) ?? 1),
+                      }))
+                    }}
+                    onStatus={reportStatus}
+                  />
+                )}
+              </div>
+              <div id="review-workspace" hidden={visibleTab !== 'review'}>
+                <ReviewWorkspace
                   entries={imageEntries}
-                  canExportDataset={exportableEntries.length > 0}
-                  exporting={exporting}
-                  onExportDataset={() => void exportDataset()}
+                  onEntriesChange={updateImageEntries}
                   onStatus={reportStatus}
                 />
-              )}
-              {mediaMode === 'video' && video && (
-                <VideoWorkspace
-                  ref={videoWorkspaceRef}
-                  file={video.file}
-                  url={video.url}
-                  onRatesChange={(rates) => {
-                    setVideoRates(rates)
-                    setSettings((current) => ({
-                      ...current,
-                      videoSampleRate: rates.includes(
-                        current.videoSampleRate,
-                      )
-                        ? current.videoSampleRate
-                        : (rates.at(-1) ?? 1),
-                    }))
-                  }}
-                  onStatus={reportStatus}
-                />
-              )}
+              </div>
             </div>
-            <div id="review-workspace" hidden={visibleTab !== 'review'}>
-              <ReviewWorkspace
-                entries={imageEntries}
-                onEntriesChange={setImageEntries}
-                onStatus={reportStatus}
-              />
-            </div>
+          </section>
+        }
+        right={
+          <div className="inspector-content">
+            <p className="section-kicker">Workspace inspector</p>
+            <h2>{visibleTab === 'review' ? 'Review details' : 'Inspector'}</h2>
+            <p>
+              {visibleTab === 'review'
+                ? 'Select a detection to inspect its class, confidence, and review state.'
+                : 'Open the inspector while reviewing an image to keep detection details nearby.'}
+            </p>
+            {visibleTab === 'review' && (
+              <div className="inspector-status" role="status">
+                <span className="semantic-dot dot-pipe-burst" />
+                <span>Semantic detection colors are shown on every box.</span>
+              </div>
+            )}
           </div>
-        </section>
-      </div>
+        }
+      />
 
       {resultsVisible && mediaMode === 'video' && (
         <DetectionSummary items={videoSummary} />

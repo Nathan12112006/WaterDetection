@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { MediaMode } from '../types'
 
 interface AppHeaderProps {
@@ -22,8 +23,10 @@ export function AppHeader({
   imageCount,
   processing,
 }: AppHeaderProps) {
+  const [helpOpen, setHelpOpen] = useState(false)
+
   return (
-    <header className="app-header">
+    <header className="app-header" data-testid="workspace-header">
       <div className="brand">
         <div className="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24">
@@ -33,7 +36,7 @@ export function AppHeader({
         </div>
         <div>
           <p className="eyebrow">Local vision workspace</p>
-          <h1>Water Leaking Detector</h1>
+          <h1>Water Detection Workspace</h1>
           <p className="header-description">
             Detect, compare, and refine water-leak annotations without
             sending media outside this service.
@@ -45,10 +48,38 @@ export function AppHeader({
           <span className={`state-dot${processing ? ' processing' : ''}`} />
           {processing ? 'Analyzing media' : workspaceLabel(mediaMode, imageCount)}
         </div>
-        <a className="docs-link" href="/docs">
-          API docs <span aria-hidden="true">↗</span>
-        </a>
+        <button
+          type="button"
+          className="help-button"
+          aria-haspopup="dialog"
+          aria-expanded={helpOpen}
+          onClick={() => setHelpOpen((open) => !open)}
+        >
+          Help / About
+        </button>
       </div>
+      {helpOpen && (
+        <div className="help-popover" role="dialog" aria-label="Help and About">
+          <div className="help-popover-heading">
+            <strong>Water Detection Workspace</strong>
+            <button
+              type="button"
+              className="help-close"
+              aria-label="Close Help / About"
+              onClick={() => setHelpOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+          <p>
+            Upload media, configure detection, review results, and export the
+            current workspace without leaving this session.
+          </p>
+          <a className="docs-link" href="/docs">
+            API documentation <span aria-hidden="true">→</span>
+          </a>
+        </div>
+      )}
     </header>
   )
 }
