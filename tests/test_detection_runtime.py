@@ -10,6 +10,7 @@ from models import Detection
 from service.detection_runtime import DetectionRuntime, _create_adapter
 from service.model_manifest import (
     GENERAL_MODEL_PATH,
+    LAST_MODEL_PATH,
     SPECIALIST_MODEL_PATH,
 )
 from utils import ConfigurationError, DetectionError, ModelManifestError
@@ -102,6 +103,63 @@ class DetectionRuntimeTests(unittest.TestCase):
             _create_adapter("specialist", "cpu")
 
         self.assertEqual(FakeBackend.calls, [(str(SPECIALIST_MODEL_PATH), "cpu")])
+
+    def test_create_adapter_loads_optional_last_root_model(self) -> None:
+        class FakeBackend:
+            calls: list[tuple[str, str]] = []
+
+            def __init__(self, *, model_path: str, device: str) -> None:
+                self.calls.append((model_path, device))
+                self.model = type(
+                    "LoadedModel",
+                    (),
+                    {
+                        "names": {
+                            0: "pipe burst",
+                            1: "water accumulation",
+                            2: "water drop",
+                        }
+                    },
+                )()
+
+        fake_backend_module = ModuleType("service.backends.torch_backend")
+        fake_backend_module.TorchBackend = FakeBackend  # type: ignore[attr-defined]
+
+        with patch.dict(
+            sys.modules,
+            {"service.backends.torch_backend": fake_backend_module},
+        ):
+            _create_adapter("last", "cpu")
+
+        self.assertEqual(FakeBackend.calls, [(str(LAST_MODEL_PATH), "cpu")])
+
+    def test_water_detection_last_uses_last_checkpoint_adapter(self) -> None:
+        last = FixedAdapter([])
+        general = FixedAdapter([])
+        specialist = FixedAdapter([])
+        adapters = {"general": general, "last": last, "specialist": specialist}
+
+        with patch("service.detection_runtime.verify_runtime_models"):
+            with patch(
+                "service.detection_runtime._create_adapter",
+                side_effect=lambda role, device: adapters[role],
+            ) as create_adapter:
+                runtime = DetectionRuntime(device="cpu")
+                runtime.detect(
+                    Image.new("RGB", (4, 4)),
+                    model="water_detection_last",
+                    confidence=0.4,
+                )
+
+        self.assertEqual(last.confidences, [0.4])
+        self.assertEqual(
+            create_adapter.call_args_list,
+            [
+                call("general", "cpu"),
+                call("specialist", "cpu"),
+                call("last", "cpu"),
+            ],
+        )
 
     def test_create_adapter_rejects_wrong_loaded_class_map(self) -> None:
         class FakeBackend:

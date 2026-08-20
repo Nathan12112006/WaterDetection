@@ -138,6 +138,9 @@ export function ControlsPanel({
           >
             <option value="water_accumulation">WaterAccumulation</option>
             <option value="water_detection">WaterDetection</option>
+            <option value="water_detection_last">
+              WaterDetection (last.pt)
+            </option>
           </select>
         </FormField>
 
@@ -181,7 +184,8 @@ export function ControlsPanel({
           </FormField>
         )}
 
-        {settings.model === 'water_detection' && (
+        {(settings.model === 'water_detection' ||
+          settings.model === 'water_detection_last') && (
           <div className="class-confidence-controls" aria-label="Class confidence thresholds">
             <p className="field-label">Class confidence</p>
             {(['pipe burst', 'water accumulation', 'water drop'] as const).map(

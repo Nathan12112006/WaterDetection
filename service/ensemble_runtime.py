@@ -83,15 +83,15 @@ class WaterDetectionEnsemble:
         verify_runtime_models()
         if three_class_adapter is None:
             self._validate_fixed_path(three_class_model, "general")
-            self._three_class = _create_torch_adapter("general", device)
+            self._general_adapter = _create_torch_adapter("general", device)
         else:
-            self._three_class = three_class_adapter
+            self._general_adapter = three_class_adapter
 
         if accumulation_adapter is None:
             self._validate_fixed_path(accumulation_model, "specialist")
-            self._accumulation = _create_torch_adapter("specialist", device)
+            self._specialist_adapter = _create_torch_adapter("specialist", device)
         else:
-            self._accumulation = accumulation_adapter
+            self._specialist_adapter = accumulation_adapter
 
     @staticmethod
     def _validate_fixed_path(path: str | Path | None, role: str) -> None:
@@ -140,23 +140,23 @@ class WaterDetectionEnsemble:
 
         normalized_image, owns_image = self._normalize_image(image)
         try:
-            general_detections = self._three_class.detect(
+            general_detections = self._general_adapter.detect(
                 normalized_image,
                 confidence,
             )
-            general_found_accumulation = any(
+            general_detected_accumulation = any(
                 _normalized_class_name(detection.class_name)
                 == _ACCUMULATION_CLASS
                 for detection in general_detections
             )
-            if general_found_accumulation:
+            if general_detected_accumulation:
                 return general_detections
 
-            specialist_detections = self._accumulation.detect(
+            specialist_detections = self._specialist_adapter.detect(
                 normalized_image,
                 accumulation_confidence,
             )
-            remapped = [
+            specialist_accumulation_detections = [
                 Detection(
                     class_name=_ACCUMULATION_CLASS,
                     confidence=detection.confidence,
@@ -166,7 +166,7 @@ class WaterDetectionEnsemble:
                 if _normalized_class_name(detection.class_name)
                 == _SPECIALIST_CLASS
             ]
-            return general_detections + remapped
+            return general_detections + specialist_accumulation_detections
         except (DetectionError, ConfigurationError):
             raise
         except Exception as error:

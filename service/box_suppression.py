@@ -3,6 +3,7 @@
 from models import Detection
 
 _CONTAINMENT_THRESHOLD = 0.95
+_SAME_CLASS_IOU_THRESHOLD = 0.4
 
 
 def suppress_contained_lower_confidence(
@@ -19,9 +20,15 @@ def suppress_contained_lower_confidence(
     for index, candidate in ranked:
         suppressed = any(
             kept.class_name == candidate.class_name
-            and kept.confidence > candidate.confidence
-            and _containment(kept.bbox, candidate.bbox)
-            >= _CONTAINMENT_THRESHOLD
+            and (
+                _iou(kept.bbox, candidate.bbox)
+                >= _SAME_CLASS_IOU_THRESHOLD
+                or (
+                    kept.confidence > candidate.confidence
+                    and _containment(kept.bbox, candidate.bbox)
+                    >= _CONTAINMENT_THRESHOLD
+                )
+            )
             for _, kept in survivors
         )
         if not suppressed:
@@ -44,6 +51,26 @@ def _containment(left: list[float], right: list[float]) -> float:
     if smaller_area <= 0.0:
         return 0.0
 
+    return _intersection_area(left, right) / smaller_area
+
+
+def _area(box: list[float]) -> float:
+    """Return a non-negative bounding-box area."""
+
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+
+
+def _iou(left: list[float], right: list[float]) -> float:
+    """Return intersection over union for two bounding boxes."""
+
+    intersection = _intersection_area(left, right)
+    union = _area(left) + _area(right) - intersection
+    return intersection / union if union > 0.0 else 0.0
+
+
+def _intersection_area(left: list[float], right: list[float]) -> float:
+    """Return the overlapping area of two bounding boxes."""
+
     intersection_width = max(
         0.0,
         min(left[2], right[2]) - max(left[0], right[0]),
@@ -52,10 +79,4 @@ def _containment(left: list[float], right: list[float]) -> float:
         0.0,
         min(left[3], right[3]) - max(left[1], right[1]),
     )
-    return intersection_width * intersection_height / smaller_area
-
-
-def _area(box: list[float]) -> float:
-    """Return a non-negative bounding-box area."""
-
-    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+    return intersection_width * intersection_height

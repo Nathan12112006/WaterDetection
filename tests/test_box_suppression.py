@@ -17,6 +17,16 @@ def detection(
 
 
 class ContainedBoxSuppressionTests(unittest.TestCase):
+    def test_discards_lower_confidence_same_class_box_above_iou_threshold(
+        self,
+    ) -> None:
+        higher = detection(0.9, [0.0, 0.0, 100.0, 100.0])
+        lower = detection(0.8, [20.0, 0.0, 120.0, 100.0])
+
+        result = suppress_contained_lower_confidence([higher, lower])
+
+        self.assertEqual(result, [higher])
+
     def test_discards_lower_confidence_smaller_box(self) -> None:
         higher = detection(0.9, [0.0, 0.0, 100.0, 100.0])
         lower = detection(0.6, [25.0, 25.0, 75.0, 75.0])

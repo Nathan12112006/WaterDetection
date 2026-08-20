@@ -16,6 +16,10 @@ class BenchmarkTests(unittest.TestCase):
             benchmark.parse_args(["--model", "water_detection"]).model,
             "water_detection",
         )
+        self.assertEqual(
+            benchmark.parse_args(["--model", "water_detection_last"]).model,
+            "water_detection_last",
+        )
         for option in ("--backend", "--checkpoint"):
             with self.subTest(option=option):
                 with redirect_stderr(io.StringIO()):

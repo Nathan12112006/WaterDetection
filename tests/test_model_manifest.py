@@ -6,8 +6,11 @@ from service.model_manifest import (
     EXPECTED_GENERAL_CLASS_NAMES,
     EXPECTED_SPECIALIST_CLASS_NAMES,
     GENERAL_MODEL_FILENAME,
+    LAST_MODEL_FILENAME,
+    LAST_MODEL_PATH,
     RUNTIME_MODEL_FILENAMES,
     SPECIALIST_MODEL_FILENAME,
+    canonical_class_name,
     normalize_class_names,
     validate_loaded_class_names,
     verify_runtime_models,
@@ -16,6 +19,13 @@ from utils import ModelManifestError
 
 
 class RuntimeModelVerificationTests(unittest.TestCase):
+    def test_optional_last_checkpoint_path_is_root_owned(self) -> None:
+        self.assertEqual(LAST_MODEL_PATH.name, LAST_MODEL_FILENAME)
+        self.assertEqual(
+            LAST_MODEL_PATH.parent,
+            Path(__file__).resolve().parent.parent,
+        )
+
     def test_verifies_only_the_two_fixed_torch_files(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -107,6 +117,19 @@ class LoadedClassMapTests(unittest.TestCase):
             validate_loaded_class_names("specialist", {0: "water damage"}),
             EXPECTED_SPECIALIST_CLASS_NAMES,
         )
+
+    def test_accepts_new_general_checkpoint_names_as_aliases(self) -> None:
+        class_map = {
+            0: "pipe_burst",
+            1: "water_accumulation",
+            2: "dripping_water",
+        }
+
+        self.assertEqual(
+            validate_loaded_class_names("general", class_map),
+            EXPECTED_GENERAL_CLASS_NAMES,
+        )
+        self.assertEqual(canonical_class_name("dripping_water"), "water drop")
 
     def test_wrong_role_classes_are_rejected(self) -> None:
         with self.assertRaisesRegex(ModelManifestError, "must be"):

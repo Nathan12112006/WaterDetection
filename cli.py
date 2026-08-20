@@ -31,9 +31,13 @@ def parse_args(argv: Sequence[str] | None = None) -> AppConfig:
     )
     parser.add_argument(
         "--model",
-        choices=["water_accumulation", "water_detection"],
+        choices=[
+            "water_accumulation",
+            "water_detection",
+            "water_detection_last",
+        ],
         default=defaults.model,
-        help="Model to run (default: water_detection; best.pt only).",
+        help="Model to run (default: water_detection; best.pt).",
     )
     parser.add_argument(
         "--conf",

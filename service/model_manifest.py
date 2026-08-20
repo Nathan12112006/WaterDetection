@@ -1,9 +1,10 @@
-"""Validate the fixed Torch checkpoints owned by the service.
+"""Validate the Torch checkpoints owned by the service.
 
 Runtime startup depends only on ``best.pt`` and ``waterAccubest.pt``.  The
 former is the three-class general detector and the latter is the legacy
-``water damage`` specialist.  A JSON manifest and ONNX exports are not part of
-this runtime contract.
+``water damage`` specialist. ``last.pt`` is an optional selectable general
+checkpoint. A JSON manifest and ONNX exports are not part of this runtime
+contract.
 
 ``verify_model_manifest`` is retained as a deprecated helper for repository
 tools that still import it.  It is intentionally not called by runtime
@@ -26,8 +27,10 @@ from utils import ModelManifestError
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 GENERAL_MODEL_FILENAME = "best.pt"
+LAST_MODEL_FILENAME = "last.pt"
 SPECIALIST_MODEL_FILENAME = "waterAccubest.pt"
 GENERAL_MODEL_PATH = PROJECT_ROOT / GENERAL_MODEL_FILENAME
+LAST_MODEL_PATH = PROJECT_ROOT / LAST_MODEL_FILENAME
 SPECIALIST_MODEL_PATH = PROJECT_ROOT / SPECIALIST_MODEL_FILENAME
 RUNTIME_MODEL_FILENAMES = {
     "general": GENERAL_MODEL_FILENAME,
@@ -45,6 +48,10 @@ EXPECTED_GENERAL_CLASS_NAMES = (
 )
 EXPECTED_SPECIALIST_CLASS_NAMES = ("water damage",)
 
+_CLASS_NAME_ALIASES = {
+    "dripping water": "water drop",
+}
+
 # Deprecated manifest-era exports.  They are kept so maintenance scripts can
 # report a useful error instead of failing at import time.  Runtime code does
 # not consume this four-artifact matrix.
@@ -55,9 +62,12 @@ MODEL_FILENAMES = {
 }
 EXPECTED_CLASS_NAMES = EXPECTED_GENERAL_CLASS_NAMES
 
-# Public runtime alias: only two fixed Torch roots, with no backend or
-# checkpoint selection.
-MODEL_PATHS = RUNTIME_MODEL_PATHS
+# Public runtime paths include the two required models and the optional
+# selectable general checkpoint.
+MODEL_PATHS = {
+    **RUNTIME_MODEL_PATHS,
+    "last": LAST_MODEL_PATH,
+}
 
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
@@ -116,12 +126,20 @@ def normalize_class_names(value: object) -> tuple[str, ...]:
     raise ModelManifestError("Model class map must be a list or dictionary.")
 
 
+def canonical_class_name(value: str) -> str:
+    """Convert supported checkpoint labels to the public application names."""
+
+    normalized = " ".join(value.strip().lower().replace("_", " ").split())
+    return _CLASS_NAME_ALIASES.get(normalized, normalized)
+
+
 def expected_class_names(model_role: str) -> tuple[str, ...]:
     """Return the exact class map required for a fixed model role."""
 
     try:
         return {
             "general": EXPECTED_GENERAL_CLASS_NAMES,
+            "last": EXPECTED_GENERAL_CLASS_NAMES,
             "specialist": EXPECTED_SPECIALIST_CLASS_NAMES,
         }[model_role]
     except KeyError as error:
@@ -134,13 +152,14 @@ def validate_loaded_class_names(model_role: str, value: object) -> tuple[str, ..
     """Validate a loaded Torch class map against its fixed model role."""
 
     names = normalize_class_names(value)
+    canonical_names = tuple(canonical_class_name(name) for name in names)
     expected = expected_class_names(model_role)
-    if names != expected:
+    if canonical_names != expected:
         raise ModelManifestError(
             f"Loaded {model_role} model classes must be {list(expected)!r}; "
             f"got {list(names)!r}."
         )
-    return names
+    return canonical_names
 
 
 def _verify_runtime_file(path: Path) -> None:

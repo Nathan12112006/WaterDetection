@@ -156,7 +156,11 @@ class DetectionApiTests(unittest.TestCase):
         )
         self.assertEqual(
             form_schema["properties"]["model"]["enum"],
-            ["water_accumulation", "water_detection"],
+            [
+                "water_accumulation",
+                "water_detection",
+                "water_detection_last",
+            ],
         )
         self.assertEqual(form_schema["properties"]["confidence"]["default"], 0.25)
         self.assertEqual(form_schema["properties"]["confidence"]["minimum"], 0.0)

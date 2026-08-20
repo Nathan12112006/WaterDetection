@@ -9,6 +9,9 @@ describe('Water Leaking Detector', () => {
       screen.getByRole('heading', { name: 'Water Leaking Detector' }),
     ).toBeTruthy()
     expect(screen.getByLabelText('Upload image or video')).toBeTruthy()
+    expect(
+      screen.getByRole('option', { name: 'WaterDetection (last.pt)' }),
+    ).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Detection preview' })).toBeTruthy()
     const reviewTab = screen.getByRole('tab', {
       name: 'Review annotations',

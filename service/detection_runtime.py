@@ -1,4 +1,4 @@
-"""Run the fixed general and accumulation Torch models."""
+"""Run the fixed general, optional last, and accumulation Torch models."""
 
 from __future__ import annotations
 
@@ -7,21 +7,29 @@ from typing import Literal, Protocol
 
 from PIL import Image
 
+from config.settings import ModelSelection
 from models import Detection
-from service.ensemble_runtime import _normalized_class_name
 from service.model_manifest import (
     MODEL_PATHS,
+    canonical_class_name,
     validate_loaded_class_names,
     verify_runtime_models,
 )
 from utils import ConfigurationError, DetectionError, ModelManifestError
 
-ModelRole = Literal["general", "specialist"]
-ModelSelection = Literal["water_accumulation", "water_detection"]
+ModelRole = Literal["general", "last", "specialist"]
 ImageInput = str | Image.Image
 
 _ACCUMULATION_CLASS = "water accumulation"
 _SPECIALIST_CLASS = "water damage"
+_REQUIRED_MODEL_ROLES: tuple[ModelRole, ...] = ("general", "specialist")
+_MODEL_ROLE_FOR_SELECTION: dict[ModelSelection, ModelRole] = {
+    "water_detection": "general",
+    "water_detection_last": "last",
+}
+_SUPPORTED_MODEL_SELECTIONS: frozenset[str] = frozenset(
+    (*_MODEL_ROLE_FOR_SELECTION, "water_accumulation")
+)
 
 
 class _InferenceAdapter(Protocol):
@@ -68,19 +76,20 @@ class DetectionRuntime:
         if not isinstance(device, str) or not device.strip():
             raise ConfigurationError("Device must not be empty.")
 
-        # This checks both fixed paths and never consults model-manifest.json.
+        # This checks the two required paths and never consults
+        # model-manifest.json. The optional last checkpoint is loaded lazily
+        # when selected.
         verify_runtime_models()
         self.device = device
         self._adapters: dict[ModelRole, _InferenceAdapter] = {}
         self._load_locks: dict[ModelRole, Lock] = {
             "general": Lock(),
+            "last": Lock(),
             "specialist": Lock(),
         }
-        # Load and validate both models before the runtime becomes available.
-        # This makes startup fail closed when either checkpoint or class map is
-        # invalid, rather than discovering a broken specialist on a fallback
-        # request later.
-        for role in ("general", "specialist"):
+        # Load and validate required models before the runtime becomes
+        # available. The optional last checkpoint is loaded on first use.
+        for role in _REQUIRED_MODEL_ROLES:
             try:
                 self._get_adapter(role)
             except (DetectionError, ModelManifestError):
@@ -101,9 +110,10 @@ class DetectionRuntime:
     ) -> list[Detection]:
         """Return detections from exactly one selected fixed model."""
 
-        if model not in {"water_accumulation", "water_detection"}:
+        if model not in _SUPPORTED_MODEL_SELECTIONS:
             raise ConfigurationError(
-                "Model must be water_accumulation or water_detection."
+                "Model must be water_accumulation, water_detection, "
+                "or water_detection_last."
             )
         self._validate_confidence(confidence, "Confidence")
         if accumulation_confidence is None:
@@ -127,12 +137,15 @@ class DetectionRuntime:
                         normalized_image,
                         accumulation_confidence,
                     )
-                    if _normalized_class_name(detection.class_name)
+                    if canonical_class_name(detection.class_name)
                     == _SPECIALIST_CLASS
                 ]
 
+            role = _MODEL_ROLE_FOR_SELECTION[model]
             return self._detect_with_adapter(
-                "general", normalized_image, confidence,
+                role,
+                normalized_image,
+                confidence,
                 class_confidences=class_confidences,
             )
         finally:

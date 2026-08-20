@@ -57,10 +57,14 @@ class CommandLineTests(unittest.TestCase):
             ],
         )
 
-    def test_model_option_accepts_the_two_public_modes(self) -> None:
+    def test_model_option_accepts_the_public_modes(self) -> None:
         self.assertEqual(
             parse_args(["--model", "water_accumulation"]).model,
             "water_accumulation",
+        )
+        self.assertEqual(
+            parse_args(["--model", "water_detection_last"]).model,
+            "water_detection_last",
         )
         with redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit) as exit_context:

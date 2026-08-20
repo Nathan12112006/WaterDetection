@@ -6,7 +6,10 @@ export type BoundingBoxTuple = [
 ]
 
 export type MediaMode = 'images' | 'video'
-export type ModelSelection = 'water_accumulation' | 'water_detection'
+export type ModelSelection =
+  | 'water_accumulation'
+  | 'water_detection'
+  | 'water_detection_last'
 export interface ClassConfidences {
   'pipe burst': number
   'water accumulation': number

@@ -1,8 +1,14 @@
 import os
 from dataclasses import dataclass
+from typing import Literal
+
 from utils import ConfigurationError
 
-ModelSelection = str
+ModelSelection = Literal[
+    "water_accumulation",
+    "water_detection",
+    "water_detection_last",
+]
 
 
 @dataclass(frozen=True)
@@ -29,9 +35,14 @@ class AppConfig:
         """
         if not self.image.strip():
             raise ConfigurationError("Image must not be empty.")
-        if self.model not in {"water_accumulation", "water_detection"}:
+        if self.model not in {
+            "water_accumulation",
+            "water_detection",
+            "water_detection_last",
+        }:
             raise ConfigurationError(
-                "Model must be water_accumulation or water_detection."
+                "Model must be water_accumulation, water_detection, "
+                "or water_detection_last."
             )
         if not 0.0 <= self.confidence <= 1.0:
             raise ConfigurationError("Confidence must be between 0.0 and 1.0.")

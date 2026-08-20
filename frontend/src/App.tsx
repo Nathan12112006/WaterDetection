@@ -53,7 +53,8 @@ const INITIAL_STATUS: StatusMessage = {
 }
 
 function effectiveConfidence(settings: DetectionSettings): number {
-  return settings.model === 'water_detection'
+  return settings.model === 'water_detection' ||
+    settings.model === 'water_detection_last'
     ? Math.min(
         settings.classConfidences['pipe burst'],
         settings.classConfidences['water accumulation'],

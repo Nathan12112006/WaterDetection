@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 3
+names: ['pipe burst', 'water accumulation', 'water drop']
+
+roboflow:
+  workspace: nathans-workspace-jv6th
+  project: waterdetect-bpuf8
+  version: 22
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/nathans-workspace-jv6th/waterdetect-bpuf8/dataset/22

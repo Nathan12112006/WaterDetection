@@ -48,6 +48,12 @@ class ServiceConfigTests(unittest.TestCase):
         self.assertFalse(hasattr(config, "backend"))
         self.assertFalse(hasattr(config, "checkpoint"))
 
+    def test_app_config_accepts_last_checkpoint_selection(self) -> None:
+        self.assertEqual(
+            AppConfig(model="water_detection_last").model,
+            "water_detection_last",
+        )
+
     def test_app_config_validates_confidence_and_device(self) -> None:
         with self.assertRaisesRegex(
             ConfigurationError,

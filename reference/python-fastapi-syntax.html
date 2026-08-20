@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python and FastAPI syntax reference</title>
+  <link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+<main>
+  <p class="kicker">Quick reference</p>
+  <h1>Python syntax used by this service</h1>
+  <div class="line"><code>from package import Name</code>Load one named object from a module.</div>
+  <div class="line"><code>@decorator</code>Pass the function below through another function that adds behavior.</div>
+  <div class="line"><code>async def name(...):</code>Define a function that can cooperate with asynchronous work.</div>
+  <div class="line"><code>parameter: Type</code>Annotate the expected parameter type.</div>
+  <div class="line"><code>-&gt; ReturnType</code>Annotate the expected return type.</div>
+  <div class="line"><code>Literal["a", "b"]</code>Describe a value restricted to listed choices for type-aware tools.</div>
+  <div class="line"><code>Annotated[Type, metadata]</code>Keep the Python type while attaching metadata FastAPI can inspect.</div>
+  <div class="line"><code>try: ... finally: ...</code>Always run the cleanup block, even when an error occurs.</div>
+  <div class="line"><code>yield</code>Pause a generator; in a lifespan context manager it separates startup from shutdown.</div>
+  <div class="line"><code>name=value</code>Pass a keyword argument, making the argument's purpose explicit.</div>
+</main>
+</body>
+</html>

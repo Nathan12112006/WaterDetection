@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from PIL import Image, ImageDraw, UnidentifiedImageError
@@ -17,6 +17,7 @@ from starlette.responses import FileResponse, Response
 
 from api.schemas import DetectionResponse
 from config import ServiceConfig
+from config.settings import ModelSelection
 from models import Detection
 from service import DetectionRuntime
 from utils import DetectionError, configure_logging
@@ -31,6 +32,8 @@ _CLASS_COLORS = {
     "water drop": "#38bdf8",
     "water damage": "#facc15",
 }
+# Retain the module-level alias for callers that import it from this module.
+ApiModelSelection = ModelSelection
 
 
 async def _enforce_upload_limit(file: UploadFile, limit: int) -> None:
@@ -119,7 +122,7 @@ async def detect_image(
     request: Request,
     file: Annotated[UploadFile, File(description="Image to process")],
     model: Annotated[
-        Literal["water_accumulation", "water_detection"],
+        ApiModelSelection,
         Form(description="Model to run"),
     ] = "water_detection",
     confidence: Annotated[
@@ -258,7 +261,7 @@ async def detect_annotated_image(
     request: Request,
     file: Annotated[UploadFile, File(description="Image to annotate")],
     model: Annotated[
-        Literal["water_accumulation", "water_detection"],
+        ApiModelSelection,
         Form(description="Model to run"),
     ] = "water_detection",
     confidence: Annotated[
@@ -370,22 +373,19 @@ def _detect_and_close_image(
     runtime: DetectionRuntime,
     image: Image.Image,
     *,
-    model: Literal["water_accumulation", "water_detection"],
+    model: ApiModelSelection,
     confidence: float,
     class_confidences: dict[str, float] | None = None,
 ) -> list[Detection]:
     """Run one bounded ensemble inference while retaining image ownership."""
 
     try:
-        if model == "water_detection":
-            if class_confidences is None:
-                return runtime.detect(image, confidence=confidence)
-            return runtime.detect(
-                image,
-                confidence=confidence,
-                class_confidences=class_confidences,
-            )
-        return runtime.detect(image, model=model, confidence=confidence)
+        inference_options: dict[str, object] = {"confidence": confidence}
+        if model != "water_detection":
+            inference_options["model"] = model
+        if model != "water_accumulation" and class_confidences is not None:
+            inference_options["class_confidences"] = class_confidences
+        return runtime.detect(image, **inference_options)
     finally:
         image.close()
 

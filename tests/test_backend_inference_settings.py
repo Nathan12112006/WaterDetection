@@ -8,6 +8,48 @@ from PIL import Image
 
 
 class BackendInferenceSettingsTests(unittest.TestCase):
+    def test_torch_backend_returns_canonical_application_class_names(self) -> None:
+        boxes = MagicMock()
+        boxes.cls.cpu.return_value.tolist.return_value = [0, 1, 2]
+        boxes.conf.cpu.return_value.tolist.return_value = [0.9, 0.8, 0.7]
+        boxes.xyxy.cpu.return_value.tolist.return_value = [
+            [0.0, 0.0, 1.0, 1.0],
+            [2.0, 2.0, 3.0, 3.0],
+            [4.0, 4.0, 5.0, 5.0],
+        ]
+        result = MagicMock()
+        result.boxes = boxes
+        result.names = {
+            0: "pipe_burst",
+            1: "water_accumulation",
+            2: "dripping_water",
+        }
+        model = MagicMock()
+        model.predict.return_value = [result]
+        fake_ultralytics = ModuleType("ultralytics")
+        fake_ultralytics.YOLO = MagicMock(return_value=model)  # type: ignore[attr-defined]
+        module_name = "service.backends.torch_backend"
+        previous_module = sys.modules.pop(module_name, None)
+
+        try:
+            with patch.dict(sys.modules, {"ultralytics": fake_ultralytics}):
+                from service.backends.torch_backend import TorchBackend
+
+                backend = TorchBackend(model_path="best.pt", device="cpu")
+                detections = backend.detect(
+                    Image.new("RGB", (8, 8)),
+                    confidence=0.25,
+                )
+        finally:
+            sys.modules.pop(module_name, None)
+            if previous_module is not None:
+                sys.modules[module_name] = previous_module
+
+        self.assertEqual(
+            [detection.class_name for detection in detections],
+            ["pipe burst", "water accumulation", "water drop"],
+        )
+
     def test_torch_backend_allows_trusted_runtime_checkpoint_loading(self) -> None:
         observed_setting: list[str | None] = []
         model = MagicMock()

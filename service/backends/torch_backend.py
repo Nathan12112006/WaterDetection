@@ -6,6 +6,7 @@ from ultralytics import YOLO
 
 from models import Detection
 from service.box_suppression import suppress_contained_lower_confidence
+from service.model_manifest import canonical_class_name
 from utils import DetectionError
 
 
@@ -81,7 +82,9 @@ class TorchBackend:
                 ):
                     detections.append(
                         Detection(
-                            class_name=result.names[int(class_id)],
+                            class_name=canonical_class_name(
+                                result.names[int(class_id)]
+                            ),
                             confidence=round(float(score), 4),
                             bbox=[round(float(value), 2) for value in bbox],
                         )

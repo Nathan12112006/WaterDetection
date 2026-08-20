@@ -29,7 +29,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--image", default="test1.jpg")
     parser.add_argument(
         "--model",
-        choices=["water_accumulation", "water_detection"],
+        choices=[
+            "water_accumulation",
+            "water_detection",
+            "water_detection_last",
+        ],
         default="water_detection",
     )
     parser.add_argument("--conf", type=float, default=0.25)
