@@ -1,0 +1,43 @@
+name: DVIDS Direct Water-Media Crawl
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/search_dvids_direct.py
+      - tools/dvids_prepare_previews.py
+      - .github/workflows/dvids-direct.yml
+
+permissions:
+  contents: read
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install requests beautifulsoup4 pillow
+      - name: Crawl public-domain water-event media
+        run: python tools/search_dvids_direct.py --max-pages 12 --search-workers 12 --page-workers 24
+      - name: Download preview screening pool
+        run: python tools/dvids_prepare_previews.py dvids_direct/media.json dvids_direct_previews
+      - name: Show statistics
+        if: always()
+        run: |
+          test -f dvids_direct/stats.json && cat dvids_direct/stats.json || true
+          test -f dvids_direct_previews/stats.json && cat dvids_direct_previews/stats.json || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvids-direct-water-media-previews
+          path: |
+            dvids_direct
+            dvids_direct_previews
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
