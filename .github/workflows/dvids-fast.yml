@@ -1,0 +1,36 @@
+name: DVIDS Fast Water-Media Discovery
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/search_dvids_fast.py
+      - .github/workflows/dvids-fast.yml
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install ddgs requests beautifulsoup4
+      - name: Run fast public-domain discovery
+        run: python tools/search_dvids_fast.py
+      - name: Show statistics
+        if: always()
+        run: test -f dvids_fast/stats.json && cat dvids_fast/stats.json || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvids-fast-water-media-search
+          path: dvids_fast
+          if-no-files-found: warn
+          retention-days: 5
+          compression-level: 6
