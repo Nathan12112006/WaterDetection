@@ -1,0 +1,31 @@
+name: DVIDS Search Page Probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/probe_dvids_search_html.py
+      - .github/workflows/dvids-search-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: python -m pip install requests beautifulsoup4
+      - run: python tools/probe_dvids_search_html.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvids-search-page-probe
+          path: dvids_search_probe
+          if-no-files-found: warn
+          retention-days: 3
+          compression-level: 6
