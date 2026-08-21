@@ -4,14 +4,14 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - tools/collect_industrial_water_candidates_v2.py
+      - tools/collect_industrial_water_candidates_v3.py
       - .github/workflows/industrial-water-candidate-collector.yml
   workflow_dispatch:
     inputs:
       per_class:
-        description: Candidate images to retain per search category
+        description: Second-wave candidates to retain per category
         required: false
-        default: "400"
+        default: "40"
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 180
     steps:
       - name: Check out collector branch
         uses: actions/checkout@v6
@@ -34,28 +34,28 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ddgs requests pillow numpy opencv-python-headless
 
-      - name: Collect candidate images
+      - name: Collect second-wave candidate images
         env:
-          PER_CLASS: ${{ github.event.inputs.per_class || '400' }}
+          PER_CLASS: ${{ github.event.inputs.per_class || '40' }}
         run: |
-          python tools/collect_industrial_water_candidates_v2.py \
-            --output collector_output \
+          python tools/collect_industrial_water_candidates_v3.py \
+            --output collector_output_wave2 \
             --per-class "$PER_CLASS"
 
       - name: Show collection statistics
         if: always()
         run: |
-          test -f collector_output/stats.json && cat collector_output/stats.json || true
-          find collector_output/images -type f -name '*.jpg' 2>/dev/null | wc -l || true
+          test -f collector_output_wave2/stats.json && cat collector_output_wave2/stats.json || true
+          find collector_output_wave2/images -type f -name '*.jpg' 2>/dev/null | wc -l || true
 
       - name: Upload candidate pool
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: industrial-water-candidates
+          name: industrial-water-candidates-wave2
           path: |
-            collector_output/industrial_water_candidates.zip
-            collector_output/stats.json
+            collector_output_wave2/industrial_water_candidates_wave2.zip
+            collector_output_wave2/stats.json
           if-no-files-found: warn
           retention-days: 7
           compression-level: 0
