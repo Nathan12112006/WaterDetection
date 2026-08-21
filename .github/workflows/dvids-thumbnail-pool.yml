@@ -1,0 +1,45 @@
+name: DVIDS Industrial Water Review Thumbnail Pool
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/collect_dvids_review_thumbnails.py
+      - .github/workflows/dvids-thumbnail-pool.yml
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install requests beautifulsoup4 pillow numpy opencv-python-headless
+      - name: Collect search thumbnails
+        run: |
+          python tools/collect_dvids_review_thumbnails.py \
+            --output dvids_thumbnail_pool \
+            --pages 8 \
+            --pipe-target 550 \
+            --drop-target 900 \
+            --accum-target 550 \
+            --max-incident-review 6
+      - name: Show statistics
+        if: always()
+        run: test -f dvids_thumbnail_pool/stats.json && cat dvids_thumbnail_pool/stats.json || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvids-industrial-water-thumbnail-pool
+          path: |
+            dvids_thumbnail_pool/dvids_thumbnail_review_pool.zip
+            dvids_thumbnail_pool/stats.json
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
