@@ -19,8 +19,19 @@ class ConfigTests(unittest.TestCase):
             config = load_config(config_file)
 
         self.assertEqual(config.video.source, "file")
-        self.assertEqual(config.video.file_path, "sample.mp4")
+        self.assertEqual(config.video.file_path, str((config_file.parent / "sample.mp4").resolve()))
         self.assertEqual(config.model.backend, "noop")
+
+    def test_relative_model_path_is_resolved_from_config_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config_file = Path(directory) / "configs" / "test.yaml"
+            config_file.parent.mkdir()
+            config_file.write_text("model:\n  backend: yolo\n  weights: ../model/best.pt\n", encoding="utf-8")
+
+            config = load_config(config_file)
+
+        expected = (config_file.parent / "../model/best.pt").resolve()
+        self.assertEqual(config.model.weights, str(expected))
 
     def test_load_config_rejects_unknown_keys(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

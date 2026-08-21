@@ -56,10 +56,14 @@ def _merge_dataclass(instance: Any, values: dict[str, Any]) -> Any:
 
 def load_config(path: str | Path) -> AppConfig:
     config = AppConfig()
-    config_path = Path(path)
+    config_path = Path(path).resolve()
     if config_path.exists():
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
         if not isinstance(raw, dict):
             raise ValueError("Configuration root must be a mapping")
         _merge_dataclass(config, raw)
+    if config.video.file_path and not Path(config.video.file_path).is_absolute():
+        config.video.file_path = str((config_path.parent / config.video.file_path).resolve())
+    if config.model.weights and not Path(config.model.weights).is_absolute():
+        config.model.weights = str((config_path.parent / config.model.weights).resolve())
     return config

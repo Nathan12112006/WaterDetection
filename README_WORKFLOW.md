@@ -19,11 +19,19 @@ water-workflow --source file --file "D:\path\to\test.mp4"
 
 ## YOLO inference
 
-The default backend is `noop`, which tests only the video/display path. To use
-the existing model:
+The default configuration loads `model/best.pt` through the `yolo` backend.
+Model paths in YAML are resolved relative to the YAML file. Run the default
+model with either input type:
 
 ```powershell
-water-workflow --source file --file "D:\path\to\test.mp4" --model yolo --weights "D:\path\to\best.pt"
+water-workflow --source camera --camera-index 0
+water-workflow --source file --file "D:\path\to\test.mp4"
+```
+
+You can still override the configured model from the command line:
+
+```powershell
+water-workflow --source file --file "D:\path\to\test.mp4" --model yolo --weights "D:\other\best.pt"
 ```
 
 The video source knows nothing about YOLO. A future frame-difference model,

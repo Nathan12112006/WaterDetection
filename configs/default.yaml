@@ -8,8 +8,8 @@ video:
   loop_file: false
 
 model:
-  backend: noop
-  weights: ""
+  backend: yolo
+  weights: ../model/best.pt
   confidence: 0.25
   iou: 0.45
   device: "0"
