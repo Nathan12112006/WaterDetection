@@ -1,35 +1,36 @@
-name: DVIDS Video Probe
+name: DVIDS Water-Media Discovery
 
 on:
   pull_request:
     branches: [main]
     paths:
-      - tools/probe_dvids_video.py
+      - tools/search_dvids_water_media.py
       - .github/workflows/dvids-probe.yml
 
 permissions:
   contents: read
 
 jobs:
-  probe:
+  discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - name: Install tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          python -m pip install yt-dlp
-      - run: python tools/probe_dvids_video.py
+      - name: Install dependencies
+        run: python -m pip install ddgs requests beautifulsoup4
+      - name: Discover public-domain DVIDS media
+        run: python tools/search_dvids_water_media.py
+      - name: Show statistics
+        if: always()
+        run: test -f dvids_search/stats.json && cat dvids_search/stats.json || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dvids-probe
-          path: dvids_probe
+          name: dvids-water-media-search
+          path: dvids_search
           if-no-files-found: warn
-          retention-days: 3
-          compression-level: 0
+          retention-days: 5
+          compression-level: 6
