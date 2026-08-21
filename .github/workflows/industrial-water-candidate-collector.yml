@@ -11,7 +11,7 @@ on:
       per_class:
         description: Candidate images to retain per search category
         required: false
-        default: "30"
+        default: "400"
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - name: Check out collector branch
         uses: actions/checkout@v6
@@ -36,7 +36,7 @@ jobs:
 
       - name: Collect candidate images
         env:
-          PER_CLASS: ${{ github.event.inputs.per_class || '30' }}
+          PER_CLASS: ${{ github.event.inputs.per_class || '400' }}
         run: |
           python tools/collect_industrial_water_candidates_v2.py \
             --output collector_output \
