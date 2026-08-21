@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "water-workflow"
+version = "0.1.0"
+description = "Video inference workflow for water leak detection"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "numpy",
+  "opencv-python",
+  "PyYAML",
+]
+
+[project.optional-dependencies]
+yolo = ["ultralytics"]
+
+[project.scripts]
+water-workflow = "water_workflow.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

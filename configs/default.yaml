@@ -1,0 +1,21 @@
+video:
+  source: camera
+  camera_index: 0
+  file_path: ""
+  width: 1280
+  height: 720
+  fps_limit: 15
+  loop_file: false
+
+model:
+  backend: noop
+  weights: ""
+  confidence: 0.25
+  iou: 0.45
+  device: "0"
+  image_size: 640
+
+display:
+  enabled: true
+  window_name: Water Workflow
+  draw_boxes: true
