@@ -11,7 +11,7 @@ on:
       per_class:
         description: Second-wave candidates to retain per category
         required: false
-        default: "40"
+        default: "400"
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 300
     steps:
       - name: Check out collector branch
         uses: actions/checkout@v6
@@ -36,7 +36,7 @@ jobs:
 
       - name: Collect second-wave candidate images
         env:
-          PER_CLASS: ${{ github.event.inputs.per_class || '40' }}
+          PER_CLASS: ${{ github.event.inputs.per_class || '400' }}
         run: |
           python tools/collect_industrial_water_candidates_v3.py \
             --output collector_output_wave2 \
