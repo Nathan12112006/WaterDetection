@@ -1,0 +1,61 @@
+name: Industrial Water Candidate Collector
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - tools/collect_industrial_water_candidates.py
+      - .github/workflows/industrial-water-candidate-collector.yml
+  workflow_dispatch:
+    inputs:
+      per_class:
+        description: Candidate images to retain per search category
+        required: false
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out collector branch
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install collector dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4 pillow numpy opencv-python-headless
+
+      - name: Collect candidate images
+        env:
+          PER_CLASS: ${{ github.event.inputs.per_class || '30' }}
+        run: |
+          python tools/collect_industrial_water_candidates.py \
+            --output collector_output \
+            --per-class "$PER_CLASS"
+
+      - name: Show collection statistics
+        if: always()
+        run: |
+          test -f collector_output/stats.json && cat collector_output/stats.json || true
+          find collector_output/images -type f -name '*.jpg' 2>/dev/null | wc -l || true
+
+      - name: Upload candidate pool
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: industrial-water-candidates
+          path: |
+            collector_output/industrial_water_candidates.zip
+            collector_output/stats.json
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
