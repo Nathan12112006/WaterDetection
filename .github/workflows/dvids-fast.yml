@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - tools/search_dvids_fast.py
+      - tools/dvids_prepare_previews.py
       - .github/workflows/dvids-fast.yml
 
 permissions:
@@ -13,24 +14,30 @@ permissions:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install dependencies
-        run: python -m pip install ddgs requests beautifulsoup4
+        run: python -m pip install ddgs requests beautifulsoup4 pillow
       - name: Run fast public-domain discovery
         run: python tools/search_dvids_fast.py
+      - name: Download preview screening pool
+        run: python tools/dvids_prepare_previews.py dvids_fast/media.json dvids_previews
       - name: Show statistics
         if: always()
-        run: test -f dvids_fast/stats.json && cat dvids_fast/stats.json || true
+        run: |
+          test -f dvids_fast/stats.json && cat dvids_fast/stats.json || true
+          test -f dvids_previews/stats.json && cat dvids_previews/stats.json || true
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dvids-fast-water-media-search
-          path: dvids_fast
+          name: dvids-fast-water-media-previews
+          path: |
+            dvids_fast
+            dvids_previews
           if-no-files-found: warn
           retention-days: 5
           compression-level: 6
