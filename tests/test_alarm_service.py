@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from water_workflow.api.schemas import DetectionEventCreate, DetectionInput
 from water_workflow.api.services import ingest_detection_event
+from water_workflow.config import AlarmConfig
 from water_workflow.database.base import Base
 from water_workflow.database.models import Alarm, Camera, DetectionEvent
 
@@ -43,6 +44,50 @@ class AlarmServiceTests(unittest.TestCase):
         _, alarm_ids = ingest_detection_event(self.db, payload)
         alarm = self.db.get(Alarm, alarm_ids[0])
         self.assertEqual(alarm.severity, "critical")
+
+    def test_accumulation_requires_three_consecutive_frames(self) -> None:
+        def submit(frame_index: int):
+            return ingest_detection_event(
+                self.db,
+                DetectionEventCreate(
+                    camera_id=self.camera_id,
+                    frame_index=frame_index,
+                    detections=[DetectionInput(label="accumulate", confidence=0.9, bbox=[1, 2, 30, 40])],
+                ),
+            )
+
+        _, alarm_ids = submit(10)
+        alarm = self.db.get(Alarm, alarm_ids[0])
+        self.assertEqual(alarm.status, "candidate")
+        self.assertEqual(alarm.consecutive_count, 1)
+
+        submit(11)
+        self.assertEqual(self.db.get(Alarm, alarm.id).status, "candidate")
+
+        submit(12)
+        alarm = self.db.get(Alarm, alarm.id)
+        self.assertEqual(alarm.status, "active")
+        self.assertEqual(alarm.consecutive_count, 3)
+        self.assertEqual(alarm.required_confirmations, 3)
+
+    def test_non_consecutive_frames_reset_candidate_streak(self) -> None:
+        config = AlarmConfig(confirmation_frames=3)
+        from water_workflow.services.detection_service import DetectionRecord, ingest_detection_records
+
+        def submit(frame_index: int):
+            return ingest_detection_records(
+                self.db,
+                self.camera_id,
+                [DetectionRecord("pipe burst", 0.9, (1, 2, 30, 40))],
+                frame_index=frame_index,
+                alarm_config=config,
+            )
+
+        _, alarm_ids = submit(1)
+        submit(3)
+        alarm = self.db.get(Alarm, alarm_ids[0])
+        self.assertEqual(alarm.status, "candidate")
+        self.assertEqual(alarm.consecutive_count, 1)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,19 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(config.video.file_path, str((config_file.parent / "sample.mp4").resolve()))
         self.assertEqual(config.model.backend, "noop")
 
+    def test_alarm_confirmation_policy_is_loaded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config_file = Path(directory) / "test.yaml"
+            config_file.write_text(
+                "alarm:\n  confirmation_frames: 4\n  water_drop_labels: [滴水, water drop]\n",
+                encoding="utf-8",
+            )
+
+            config = load_config(config_file)
+
+        self.assertEqual(config.alarm.confirmation_frames, 4)
+        self.assertEqual(config.alarm.water_drop_labels, ["滴水", "water drop"])
+
     def test_relative_model_path_is_resolved_from_config_directory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             config_file = Path(directory) / "configs" / "test.yaml"

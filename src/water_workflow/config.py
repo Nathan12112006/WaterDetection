@@ -36,10 +36,32 @@ class DisplayConfig:
 
 
 @dataclass
+class DatabaseConfig:
+    enabled: bool = False
+    camera_id: int | None = None
+    write_detection_events: bool = True
+
+
+@dataclass
+class AlarmConfig:
+    """Temporal confirmation policy for database alarms.
+
+    Water drops are intentionally immediate because a drop can be brief and
+    may disappear between sampled frames.  More persistent-looking classes
+    use consecutive-frame confirmation to reduce one-frame false positives.
+    """
+
+    confirmation_frames: int = 3
+    water_drop_labels: list[str] = field(default_factory=lambda: ["water drop", "water_drop", "滴水", "水滴"])
+
+
+@dataclass
 class AppConfig:
     video: VideoConfig = field(default_factory=VideoConfig)
     model: ModelConfig = field(default_factory=ModelConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
+    database: DatabaseConfig = field(default_factory=DatabaseConfig)
+    alarm: AlarmConfig = field(default_factory=AlarmConfig)
 
 
 def _merge_dataclass(instance: Any, values: dict[str, Any]) -> Any:

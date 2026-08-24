@@ -44,6 +44,9 @@ class AlarmRead(BaseModel):
     acknowledged_at: datetime | None
     resolved_at: datetime | None
     frame_count: int
+    consecutive_count: int
+    required_confirmations: int
+    last_frame_index: int | None
     area_pixels: int | None
     message: str | None
     created_at: datetime
@@ -70,6 +73,54 @@ class DetectionEventCreate(BaseModel):
 class DetectionEventResponse(BaseModel):
     event_ids: list[int]
     alarm_ids: list[int]
+
+
+class DetectionEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    camera_id: int
+    model_version_id: int | None
+    frame_index: int | None
+    event_time: datetime
+    label: str
+    confidence: float
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    source_branch: str
+    area_pixels: int | None
+    metadata_json: dict[str, Any] | None
+    created_at: datetime
+
+
+class DetectionEventPage(BaseModel):
+    items: list[DetectionEventRead]
+    page: int
+    page_size: int
+    total: int
+
+
+class ModelVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    model_name: str
+    model_type: str
+    weights_path: str
+    version: str
+    confidence_threshold: float | None
+    iou_threshold: float | None
+    device: str | None
+    image_size: int | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class CameraStatusRead(BaseModel):
+    camera: CameraRead
+    active_alarm_count: int
+    latest_event_time: datetime | None
 
 
 class AlarmPage(BaseModel):

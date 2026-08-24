@@ -77,6 +77,9 @@ class Alarm(TimestampMixin, Base):
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
     frame_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    consecutive_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    required_confirmations: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_frame_index: Mapped[int | None] = mapped_column(Integer)
     area_pixels: Mapped[int | None] = mapped_column(Integer)
     message: Mapped[str | None] = mapped_column(Text)
 

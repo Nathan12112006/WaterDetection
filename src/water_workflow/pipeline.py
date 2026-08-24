@@ -4,6 +4,8 @@ import cv2
 
 from .config import AppConfig
 from .models import DetectionModel
+from .database.session import get_session_factory
+from .services import DetectionPersistence
 from .video import FramePacket, VideoSource
 
 
@@ -12,11 +14,18 @@ class Workflow:
         self.config = config
         self.source = source
         self.model = model
+        self.persistence: DetectionPersistence | None = None
+        if config.database.enabled and config.database.write_detection_events:
+            if config.database.camera_id is None:
+                raise ValueError("database.camera_id is required when database.enabled is true")
+            self.persistence = DetectionPersistence(config.database.camera_id, config.model, get_session_factory(), config.alarm)
 
     def run(self) -> None:
         try:
             for packet in self.source:
                 detections = self.model.predict(packet.frame)
+                if self.persistence is not None and detections:
+                    self.persistence.write(packet.frame_index, packet.timestamp_seconds, detections)
                 annotated = self._annotate(packet, detections)
                 if self.config.display.enabled:
                     cv2.imshow(self.config.display.window_name, annotated)
@@ -25,6 +34,8 @@ class Workflow:
         finally:
             self.source.close()
             self.model.close()
+            if self.persistence is not None:
+                self.persistence.close()
             cv2.destroyAllWindows()
 
     def _annotate(self, packet: FramePacket, detections: list) -> object:

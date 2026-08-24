@@ -1,16 +1,32 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from ..database import Alarm, Camera, get_db
+from ..config import load_config
+from ..database import Alarm, Camera, DetectionEvent, ModelVersion, get_db
 from ..database.models import utcnow
 from ..database.init_db import init_database
-from .schemas import AlarmPage, AlarmRead, CameraCreate, CameraRead, CameraUpdate, DetectionEventCreate, DetectionEventResponse
+from .schemas import (
+    AlarmPage,
+    AlarmRead,
+    CameraCreate,
+    CameraRead,
+    CameraStatusRead,
+    CameraUpdate,
+    DetectionEventCreate,
+    DetectionEventPage,
+    DetectionEventResponse,
+    ModelVersionRead,
+)
 from .services import ingest_detection_event
 
 app = FastAPI(title="Water Leak Workflow API", version="0.1.0")
+_config_path = os.environ.get("WATER_WORKFLOW_CONFIG", "configs/default.yaml")
+API_ALARM_CONFIG = load_config(_config_path).alarm
 
 
 @app.get("/api/v1/health")
@@ -36,6 +52,30 @@ def create_camera(payload: CameraCreate, db: Session = Depends(get_db)) -> Camer
 @app.get("/api/v1/cameras", response_model=list[CameraRead])
 def list_cameras(db: Session = Depends(get_db)) -> list[Camera]:
     return list(db.scalars(select(Camera).order_by(Camera.id)).all())
+
+
+@app.get("/api/v1/cameras/{camera_id}/status", response_model=CameraStatusRead)
+def get_camera_status(camera_id: int, db: Session = Depends(get_db)) -> CameraStatusRead:
+    camera = db.get(Camera, camera_id)
+    if camera is None:
+        raise HTTPException(status_code=404, detail="camera not found")
+    active_alarm_count = db.scalar(
+        select(func.count()).select_from(Alarm).where(
+            Alarm.camera_id == camera_id,
+            Alarm.status.in_(("active", "acknowledged")),
+        )
+    ) or 0
+    latest_event_time = db.scalar(
+        select(DetectionEvent.event_time)
+        .where(DetectionEvent.camera_id == camera_id)
+        .order_by(DetectionEvent.event_time.desc())
+        .limit(1)
+    )
+    return CameraStatusRead(
+        camera=camera,
+        active_alarm_count=active_alarm_count,
+        latest_event_time=latest_event_time,
+    )
 
 
 @app.get("/api/v1/cameras/{camera_id}", response_model=CameraRead)
@@ -70,6 +110,40 @@ def list_alarms(status: str | None = None, camera_id: int | None = None, alarm_t
     query = select(Alarm).where(*filters).order_by(Alarm.last_detected_at.desc()).offset((page - 1) * page_size).limit(page_size)
     total = db.scalar(select(func.count()).select_from(Alarm).where(*filters)) or 0
     return AlarmPage(items=list(db.scalars(query).all()), page=page, page_size=page_size, total=total)
+
+
+@app.get("/api/v1/detection-events", response_model=DetectionEventPage)
+def list_detection_events(
+    camera_id: int | None = None,
+    label: str | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> DetectionEventPage:
+    filters = []
+    if camera_id is not None:
+        filters.append(DetectionEvent.camera_id == camera_id)
+    if label:
+        filters.append(DetectionEvent.label == label)
+    query = (
+        select(DetectionEvent)
+        .where(*filters)
+        .order_by(DetectionEvent.event_time.desc(), DetectionEvent.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    total = db.scalar(select(func.count()).select_from(DetectionEvent).where(*filters)) or 0
+    return DetectionEventPage(
+        items=list(db.scalars(query).all()),
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
+
+
+@app.get("/api/v1/model-versions", response_model=list[ModelVersionRead])
+def list_model_versions(db: Session = Depends(get_db)) -> list[ModelVersion]:
+    return list(db.scalars(select(ModelVersion).order_by(ModelVersion.created_at.desc())).all())
 
 
 @app.get("/api/v1/alarms/{alarm_id}", response_model=AlarmRead)
@@ -112,7 +186,7 @@ def resolve_alarm(alarm_id: int, db: Session = Depends(get_db)) -> Alarm:
 
 @app.post("/api/v1/internal/detection-events", response_model=DetectionEventResponse, status_code=201)
 def create_detection_event(payload: DetectionEventCreate, db: Session = Depends(get_db)) -> DetectionEventResponse:
-    event_ids, alarm_ids = ingest_detection_event(db, payload)
+    event_ids, alarm_ids = ingest_detection_event(db, payload, API_ALARM_CONFIG)
     return DetectionEventResponse(event_ids=event_ids, alarm_ids=alarm_ids)
 
 
