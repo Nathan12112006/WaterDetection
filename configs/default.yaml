@@ -1,10 +1,10 @@
 video:
-  source: camera
+  source: camera #file
   camera_index: 0
-  file_path: ""
+  file_path: "" #../video/03.mp4
   width: 1280
   height: 720
-  fps_limit: 15
+  fps_limit: 30
   loop_file: false
 
 model:

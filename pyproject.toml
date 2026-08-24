@@ -11,6 +11,12 @@ dependencies = [
   "numpy",
   "opencv-python",
   "PyYAML",
+  "SQLAlchemy>=2.0,<3.0",
+  "PyMySQL>=1.1,<2.0",
+  "python-dotenv>=1.0,<2.0",
+  "fastapi>=0.115,<1.0",
+  "uvicorn[standard]>=0.34,<1.0",
+  "alembic>=1.15,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +24,8 @@ yolo = ["ultralytics"]
 
 [project.scripts]
 water-workflow = "water_workflow.cli:main"
+water-workflow-api = "water_workflow.api.app:main"
+water-workflow-init-db = "water_workflow.database.init_db:init_database"
 
 [tool.setuptools.packages.find]
 where = ["src"]

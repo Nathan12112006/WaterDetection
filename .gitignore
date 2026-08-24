@@ -1,8 +1,63 @@
+# Secrets and machine-local environment files
 .env
+.env.*
+!.env.example
+
+# IDE/editor state
 .idea/
+.vscode/
+*.iml
+
+# Python caches, virtual environments, and build output
 __pycache__/
 *.py[cod]
+*.pyd
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
+venv/
+env/
+build/
+dist/
+*.egg-info/
+
+# Coverage and test reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Runtime output, logs, and temporary files
 artifacts/
 runs/
+outputs/
+logs/
+tmp/
+temp/
+*.log
+
+# Large local inference/training assets
+model/
+video/
+datasets/
+data/
+weights/
+checkpoints/
+
+# Alarm screenshots, clips, and other generated media
+media/
+
+# Local database files (Docker MySQL data is stored in a named volume)
+*.db
+*.sqlite
+*.sqlite3
+
+# Machine-specific YAML overrides; keep configs/default.yaml versioned
+configs/local.yaml
+configs/*.local.yaml
+configs/*_local.yaml
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
