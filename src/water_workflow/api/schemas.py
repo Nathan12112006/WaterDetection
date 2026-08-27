@@ -128,3 +128,28 @@ class AlarmPage(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class VisionEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    event_id: str
+    event_revision: int
+    event_status: str
+    event_type: str
+    camera_id: str
+    risk_region_id: str | None
+    occurred_at: datetime
+    confidence: float
+    source_branches: list[str]
+    model_versions: list[str]
+    config_revision: str
+    bbox: list[int] | None
+    area_ratio_in_risk_region: float | None
+    created_at: datetime
+
+
+class VisionEventPage(BaseModel):
+    items: list[VisionEventRead]
+    next_cursor: int | None
+    limit: int

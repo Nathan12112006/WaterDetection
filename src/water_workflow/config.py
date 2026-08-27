@@ -91,6 +91,7 @@ class MonitoringRuntimeConfig:
     max_frame_age_ms: int = 1000
     warmup_timeout_seconds: float = 30.0
     inference_timeout_ms: int = 1000
+    health_stale_after_ms: int = 5000
 
 
 @dataclass
@@ -256,6 +257,10 @@ def _validate_monitoring(config: MonitoringConfig) -> None:
         raise ValueError("monitoring.runtime.max_frame_age_ms must be at least 1")
     if config.runtime.warmup_timeout_seconds <= 0:
         raise ValueError("monitoring.runtime.warmup_timeout_seconds must be greater than zero")
+    if config.runtime.inference_timeout_ms < 1:
+        raise ValueError("monitoring.runtime.inference_timeout_ms must be at least 1")
+    if config.runtime.health_stale_after_ms < 1:
+        raise ValueError("monitoring.runtime.health_stale_after_ms must be at least 1")
     branches = config.branches
     for name, branch in (
         ("full_frame_detection", branches.full_frame_detection),

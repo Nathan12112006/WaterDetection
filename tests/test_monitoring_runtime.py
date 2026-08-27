@@ -8,11 +8,12 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from water_workflow.config import load_config
+from water_workflow.config import CameraMonitoringConfig, MonitoringRuntimeConfig, SourceConfig, load_config
 from water_workflow.monitoring.buffer import LatestFrameBuffer
 from water_workflow.monitoring.engine import MonitoringEngine
 from water_workflow.monitoring.scheduler import BranchScheduler, SharedDetectionRunner
 from water_workflow.monitoring.types import WorkerState
+from water_workflow.monitoring.worker import CameraWorker
 from water_workflow.models.base import Detection
 from water_workflow.video.types import FramePacket
 
@@ -27,6 +28,30 @@ class CountingModel:
 
     def close(self):
         return None
+
+
+class OneFrameSource:
+    is_live = False
+
+    def open(self):
+        return None
+
+    def read(self):
+        if getattr(self, "done", False):
+            return None
+        self.done = True
+        return FramePacket(np.zeros((8, 8, 3), dtype=np.uint8), 1, 1.0, camera_id="slow")
+
+    def close(self):
+        return None
+
+
+class SlowProcessor:
+    def process(self, packet):
+        time.sleep(0.02)
+        from water_workflow.monitoring.types import FrameProcessingResult
+
+        return FrameProcessingResult(packet)
 
 
 class MonitoringRuntimeTests(unittest.TestCase):
@@ -83,6 +108,23 @@ class MonitoringRuntimeTests(unittest.TestCase):
                 self.assertTrue(all(item.frames_processed > 0 for item in engine.status().values()))
             finally:
                 engine.close()
+
+    def test_inference_timeout_is_visible_in_worker_status(self) -> None:
+        worker = CameraWorker(
+            CameraMonitoringConfig(camera_id="slow", source=SourceConfig(type="file", path="unused")),
+            OneFrameSource(),
+            SlowProcessor(),
+            sink=type("Sink", (), {"publish": lambda self, result: None, "close": lambda self: None})(),
+            runtime=MonitoringRuntimeConfig(inference_timeout_ms=1),
+        )
+        worker.start()
+        deadline = time.time() + 1
+        while time.time() < deadline and worker.snapshot().frames_processed == 0:
+            time.sleep(0.01)
+        snapshot = worker.snapshot()
+        worker.stop()
+        self.assertEqual(snapshot.state, WorkerState.DEGRADED)
+        self.assertEqual(snapshot.inference_timeout_count, 1)
 
 
 if __name__ == "__main__":

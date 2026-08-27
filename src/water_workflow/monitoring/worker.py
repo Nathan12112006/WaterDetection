@@ -48,6 +48,8 @@ class CameraWorker:
         self._frames_processed = 0
         self._last_error: str | None = None
         self._source_thread: threading.Thread | None = None
+        self._last_inference_latency_ms: float | None = None
+        self._inference_timeout_count = 0
 
     @property
     def camera_id(self) -> str:
@@ -87,18 +89,31 @@ class CameraWorker:
 
     def _process_loop(self) -> None:
         processed_once = False
+        warmup_deadline = time.monotonic() + self.runtime.warmup_timeout_seconds
         try:
             while not self._stop.is_set():
                 packet = self.buffer.get(timeout=0.2)
                 if packet is None:
                     if self.buffer.closed:
                         break
+                    if not processed_once and time.monotonic() >= warmup_deadline:
+                        self.state = WorkerState.DEGRADED
+                        self._last_error = "warmup timed out before first processed frame"
+                        break
                     continue
                 if packet.captured_at is not None:
                     age_ms = (datetime.now(timezone.utc) - packet.captured_at).total_seconds() * 1000
                     if age_ms > self.runtime.max_frame_age_ms:
                         continue
+                started = time.monotonic()
                 result = self.processor.process(packet)
+                self._last_inference_latency_ms = (time.monotonic() - started) * 1000
+                if self._last_inference_latency_ms > self.runtime.inference_timeout_ms:
+                    self._inference_timeout_count += 1
+                    self.state = WorkerState.DEGRADED
+                    self._last_error = (
+                        f"inference exceeded timeout: {self._last_inference_latency_ms:.1f}ms"
+                    )
                 self.sink.publish(result)
                 if self.event_state_machine is not None and self.event_sink is not None:
                     for event in self.event_state_machine.observe(
@@ -109,7 +124,7 @@ class CameraWorker:
                         self.event_sink.publish(event)
                 self._frames_processed += 1
                 self._last_inference_at = datetime.now(timezone.utc)
-                if not processed_once:
+                if not processed_once and self.state != WorkerState.DEGRADED:
                     self.state = WorkerState.HEALTHY
                     processed_once = True
         except Exception as exc:
@@ -132,6 +147,14 @@ class CameraWorker:
         last_age = None
         if self._last_frame_at is not None:
             last_age = (datetime.now(timezone.utc) - self._last_frame_at).total_seconds() * 1000
+        if (
+            self.source.is_live
+            and last_age is not None
+            and last_age > self.runtime.health_stale_after_ms
+            and self.state == WorkerState.HEALTHY
+        ):
+            self.state = WorkerState.DEGRADED
+            self._last_error = f"latest frame is stale: {last_age:.1f}ms"
         return WorkerSnapshot(
             camera_id=self.camera_id,
             state=self.state,
@@ -143,4 +166,6 @@ class CameraWorker:
             frames_dropped=self.buffer.dropped,
             last_frame_age_ms=last_age,
             last_error=self._last_error,
+            last_inference_latency_ms=self._last_inference_latency_ms,
+            inference_timeout_count=self._inference_timeout_count,
         )

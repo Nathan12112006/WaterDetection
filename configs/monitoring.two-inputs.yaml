@@ -1,0 +1,51 @@
+monitoring:
+  enabled: true
+
+  runtime:
+    queue_size: 2
+    max_frame_age_ms: 1000
+    warmup_timeout_seconds: 30
+    inference_timeout_ms: 1000
+    health_stale_after_ms: 5000
+
+  branches:
+    full_frame_detection:
+      enabled: true
+      interval_ms: 1000
+
+    motion_crop_detection:
+      enabled: false
+
+    water_surface_segmentation:
+      enabled: false
+
+  cameras:
+    - camera_id: file-07
+      name: 本地测试视频
+      source:
+        type: file
+        path: D:/ProgramProject_Hub/WaterDetection/video/07.mp4
+        loop: true
+        fps_limit: 10
+
+    - camera_id: camera-01
+      name: USB摄像头
+      source:
+        type: camera
+        camera_index: 0
+        fps_limit: 10
+
+models:
+  detector:
+    backend: noop
+    weights: ""
+  water_surface_seg:
+    backend: noop
+    weights: ""
+
+display:
+  enabled: false
+  draw_boxes: true
+
+database:
+  enabled: false

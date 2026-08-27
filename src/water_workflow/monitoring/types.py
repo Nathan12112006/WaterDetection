@@ -101,6 +101,8 @@ class WorkerSnapshot:
     frames_dropped: int
     last_frame_age_ms: float | None
     last_error: str | None
+    last_inference_latency_ms: float | None = None
+    inference_timeout_count: int = 0
 
 
 class FrameSource(Protocol):

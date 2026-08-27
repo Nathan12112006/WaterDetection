@@ -4,9 +4,11 @@ from dataclasses import dataclass
 
 from ..config import AppConfig, effective_monitoring_cameras
 from ..models.factory import create_model, create_segmentation_model
+from ..database.session import get_session_factory
 from .scheduler import BranchScheduler, SharedDetectionRunner, SharedSegmentationRunner
 from .sources import create_frame_source
 from .events import VisionEventStateMachine
+from .persistence import SqlAlchemyVisionEventSink
 from .types import FrameProcessingResult, ServiceState, VisionEvent, WorkerState
 from .worker import CameraWorker
 
@@ -60,7 +62,11 @@ class MonitoringSupervisor:
         sink_factory = sink_factory or (lambda camera_id: MemoryResultSink())
         for camera in effective_monitoring_cameras(config):
             sink = sink_factory(camera.camera_id)
-            event_sink = MemoryEventSink()
+            event_sink = (
+                SqlAlchemyVisionEventSink(get_session_factory())
+                if config.database.enabled
+                else MemoryEventSink()
+            )
             source = create_frame_source(camera.camera_id, camera.source)
             processor = BranchScheduler(
                 camera.camera_id,

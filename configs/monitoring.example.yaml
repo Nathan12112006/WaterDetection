@@ -5,6 +5,7 @@ monitoring:
     max_frame_age_ms: 1000
     warmup_timeout_seconds: 30
     inference_timeout_ms: 1000
+    health_stale_after_ms: 5000
   branches:
     full_frame_detection: {enabled: true, interval_ms: 1000}
     motion_crop_detection:

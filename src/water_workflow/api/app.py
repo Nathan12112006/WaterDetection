@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 
+import cv2
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.responses import Response
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from ..config import load_config
-from ..database import Alarm, Camera, DetectionEvent, ModelVersion, get_db
+from ..database import Alarm, Camera, DetectionEvent, ModelVersion, VisionEventRecord, get_db
 from ..database.models import utcnow
 from ..database.init_db import init_database
 from ..monitoring.engine import MonitoringEngine
@@ -22,6 +24,8 @@ from .schemas import (
     DetectionEventPage,
     DetectionEventResponse,
     ModelVersionRead,
+    VisionEventPage,
+    VisionEventRead,
 )
 from .services import ingest_detection_event
 
@@ -54,6 +58,35 @@ def monitoring_status() -> dict:
         "service_state": engine.service_state(),
         "workers": engine.status(),
     }
+
+
+def _snapshot_response(camera_id: str, *, annotated: bool) -> Response:
+    engine = get_monitoring_engine()
+    try:
+        result = engine.latest_result(camera_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"monitoring camera not found: {camera_id}") from exc
+    if result is None:
+        raise HTTPException(status_code=503, detail="camera has no processed frame yet")
+    frame = result.annotated_frame if annotated else result.frame.frame
+    if frame is None:
+        raise HTTPException(status_code=503, detail="requested frame is unavailable")
+    success, encoded = cv2.imencode(".jpg", frame)
+    if not success:
+        raise HTTPException(status_code=500, detail="failed to encode camera frame")
+    return Response(content=encoded.tobytes(), media_type="image/jpeg")
+
+
+@app.get("/api/v1/cameras/{camera_id}/snapshot", response_class=Response)
+def camera_snapshot(camera_id: str) -> Response:
+    """Return the latest raw frame without blocking the monitoring worker."""
+    return _snapshot_response(camera_id, annotated=False)
+
+
+@app.get("/api/v1/cameras/{camera_id}/annotated-snapshot", response_class=Response)
+def camera_annotated_snapshot(camera_id: str) -> Response:
+    """Return the latest frame with optional detection/segmentation overlays."""
+    return _snapshot_response(camera_id, annotated=True)
 
 
 @app.post("/api/v1/monitoring/start")
@@ -181,6 +214,61 @@ def list_detection_events(
         page_size=page_size,
         total=total,
     )
+
+
+@app.get("/api/v1/vision-events", response_model=VisionEventPage)
+def list_vision_events(
+    camera_id: str | None = None,
+    event_id: str | None = None,
+    after_id: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> VisionEventPage:
+    """Read durable visual events using an id cursor for backend compensation."""
+    filters = [VisionEventRecord.id > after_id]
+    if camera_id:
+        filters.append(VisionEventRecord.camera_id == camera_id)
+    if event_id:
+        filters.append(VisionEventRecord.event_id == event_id)
+    rows = list(
+        db.scalars(
+            select(VisionEventRecord)
+            .where(*filters)
+            .order_by(VisionEventRecord.id.asc())
+            .limit(limit + 1)
+        ).all()
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return VisionEventPage(
+        items=rows,
+        next_cursor=rows[-1].id if has_more and rows else None,
+        limit=limit,
+    )
+
+
+@app.get("/api/v1/vision-events/compensation", response_model=VisionEventPage)
+def compensate_vision_events(
+    after_id: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> VisionEventPage:
+    """Stable alias for backend replay after a real-time notification gap."""
+    return list_vision_events(after_id=after_id, limit=limit, db=db)
+
+
+@app.get("/api/v1/vision-events/{event_id}", response_model=list[VisionEventRead])
+def get_vision_event_revisions(event_id: str, db: Session = Depends(get_db)) -> list[VisionEventRecord]:
+    rows = list(
+        db.scalars(
+            select(VisionEventRecord)
+            .where(VisionEventRecord.event_id == event_id)
+            .order_by(VisionEventRecord.event_revision.asc())
+        ).all()
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="vision event not found")
+    return rows
 
 
 @app.get("/api/v1/model-versions", response_model=list[ModelVersionRead])

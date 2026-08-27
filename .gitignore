@@ -61,3 +61,39 @@ configs/*_local.yaml
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Java / Spring Boot integration harness
+integration/**/target/
+integration/**/.mvn/
+
+# Archived duplicate layouts and local migration backups
+_archive/
+
+# Local monitoring configurations
+configs/monitoring.*.yaml
+!configs/monitoring.example.yaml
+!configs/monitoring.production.example.yaml
+
+# Local model weights and inference artifacts
+*.pt
+*.pth
+*.onnx
+*.engine
+*.torchscript
+
+# Video and image exports generated during testing
+*.avi
+*.mp4
+*.mov
+*.mkv
+snapshots/
+screenshots/
+
+# Local test output
+test-results/
+junit-reports/
+
+# OS / Python tooling
+.python-version
+.pyright/
+.pyre/
