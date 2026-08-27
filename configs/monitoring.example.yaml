@@ -1,0 +1,42 @@
+monitoring:
+  enabled: true
+  runtime:
+    queue_size: 2
+    max_frame_age_ms: 1000
+    warmup_timeout_seconds: 30
+    inference_timeout_ms: 1000
+  branches:
+    full_frame_detection: {enabled: true, interval_ms: 1000}
+    motion_crop_detection:
+      enabled: true
+      interval_ms: 200
+      max_crops_per_frame: 2
+      padding_ratio: 0.2
+    water_surface_segmentation:
+      enabled: false
+      interval_ms: 2000
+      roi_required: true
+      min_intersection_area_pixels: 16
+      min_area_ratio_in_risk_region: 0.002
+  events:
+    water_drop: {confirm_hits: 2, confirm_window_seconds: 2, recovery_quiet_seconds: 10, min_confidence: 0.25, update_interval_seconds: 1}
+    pipe_burst: {confirm_hits: 2, confirm_window_seconds: 2, recovery_quiet_seconds: 10, min_confidence: 0.25, update_interval_seconds: 1}
+    water_accumulation: {confirm_hits: 3, confirm_window_seconds: 10, recovery_quiet_seconds: 20, min_confidence: 0.25, update_interval_seconds: 2}
+  cameras:
+    - camera_id: demo-file-01
+      name: 本地演示视频
+      source: {type: file, path: ../video/demo.mp4, loop: true, fps_limit: 15}
+      risk_regions:
+        - region_id: floor-north
+          coordinate_space: normalized
+          polygon: [[0.05, 0.45], [0.95, 0.45], [0.95, 0.95], [0.05, 0.95]]
+          exclude_polygons:
+            - [[0.10, 0.55], [0.25, 0.55], [0.25, 0.80], [0.10, 0.80]]
+    - camera_id: rtsp-01
+      name: 纯水房北侧
+      source: {type: rtsp, uri: rtsp://user:password@example/live, reconnect: true}
+
+models:
+  detector: {backend: noop, weights: "", confidence: 0.25, iou: 0.45, device: "0", image_size: 640}
+  water_surface_seg: {backend: noop, weights: "", confidence: 0.25, iou: 0.45, device: "0", image_size: 640}
+display: {enabled: false, draw_boxes: true}

@@ -26,6 +26,7 @@ yolo = ["ultralytics"]
 water-workflow = "water_workflow.cli:main"
 water-workflow-api = "water_workflow.api.app:main"
 water-workflow-init-db = "water_workflow.database.init_db:init_database"
+water-workflow-monitor = "water_workflow.monitoring_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,0 +1,35 @@
+video:
+  source: camera
+  camera_index: 0
+  file_path: ""
+  width: 1280
+  height: 720
+  fps_limit: 15
+  loop_file: false
+
+model:
+  backend: yolo
+  weights: ../model/best.pt
+  confidence: 0.25
+  iou: 0.45
+  device: "0"
+  image_size: 640
+
+display:
+  enabled: true
+  window_name: Water Workflow
+  draw_boxes: true
+
+database:
+  enabled: true
+  camera_id: 1
+  write_detection_events: true
+
+alarm:
+  # 滴水/水滴单帧即可告警；积水、喷水、爆管等类别需要连续确认。
+  confirmation_frames: 3
+  water_drop_labels:
+    - water drop
+    - water_drop
+    - 滴水
+    - 水滴

@@ -79,3 +79,20 @@ water-workflow-api
 Open `http://127.0.0.1:8000/docs` for Swagger UI. See
 `docs/api-development.md` for camera, alarm, detection-event, model-version,
 and internal ingestion endpoints.
+
+## Multi-camera monitoring
+
+The `water-workflow-monitor` entry point runs the composable multi-camera
+runtime. Configure cameras under `monitoring.cameras`; each camera can use a
+local file (`type: file`), a device index (`type: camera`), or an RTSP URI
+(`type: rtsp`). Existing `video`/`model` YAML and the `water-workflow` command
+remain supported as a single-camera compatibility mode.
+
+```powershell
+water-workflow-monitor --config configs/monitoring.example.yaml
+```
+
+The runtime keeps one worker, frame buffer, branch scheduler and state context
+per camera while sharing model instances behind a serialized runner. Persistence
+and the final vision-event state machine remain behind the same interfaces for
+the next implementation phase.
