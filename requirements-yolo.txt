@@ -1,0 +1,3 @@
+# Install requirements.txt first.
+# PyTorch/CUDA should be selected according to the target GPU and driver.
+ultralytics>=8.3,<9
